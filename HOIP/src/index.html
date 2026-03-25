@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nice Méridia | Command Center</title>
+    <title>Nice Méridia | Traffic Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -11,193 +11,194 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
         
         :root {
-            --bg: #0d1117;
-            --card: #161b22;
+            --bg-deep: #05070a;
+            --bg-panel: #0d1117;
             --accent: #3b82f6;
-            --border: rgba(255, 255, 255, 0.08);
+            --traffic-flow: #10b981;
+            --traffic-heavy: #ef4444;
+            --border: rgba(255, 255, 255, 0.05);
         }
 
-        body { background-color: var(--bg); color: #c9d1d9; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .glass { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(10px); }
+        body { background-color: var(--bg-deep); color: #c9d1d9; font-family: 'Inter', sans-serif; overflow: hidden; }
         
-        /* Map Layers */
-        #map-viewport { background: #080808; position: relative; border-radius: 12px; overflow: hidden; }
-        .map-grid { position: absolute; inset: 0; background-image: radial-gradient(#21262d 1px, transparent 1px); background-size: 30px 30px; }
-        .gis-road { position: absolute; background: #21262d; z-index: 1; }
-        .gis-water { position: absolute; background: rgba(59, 130, 246, 0.1); border-bottom: 2px solid #1f6feb; z-index: 1; }
-
-        /* Building Nodes */
-        .building-node {
-            position: absolute; border: 1px solid #fff; cursor: pointer;
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 10;
+        /* Polished Sidebar */
+        #side-nav {
+            width: 80px; background: #010409; border-right: 1px solid var(--border);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000;
         }
-        .building-node:hover { transform: scale(1.1); box-shadow: 0 0 25px var(--accent); z-index: 50; }
-        .node-label { position: absolute; top: -20px; left: 0; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; white-space: nowrap; }
-
-        /* Custom Polished Modal */
-        #building-modal {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-            z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: 0.3s;
+        #side-nav:hover { width: 240px; }
+        .nav-link {
+            display: flex; align-items: center; height: 64px; padding: 0 28px;
+            color: #484f58; transition: 0.2s; cursor: pointer; border-left: 3px solid transparent;
         }
-        #building-modal.active { display: flex; opacity: 1; }
-        .modal-content {
-            width: 400px; padding: 2rem; border-radius: 16px; transform: scale(0.9); transition: 0.3s;
-            border-top: 4px solid var(--accent); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        .nav-link:hover, .nav-link.active { color: #fff; background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%); border-left-color: var(--accent); }
+        .nav-label { margin-left: 20px; font-weight: 600; font-size: 12px; opacity: 0; white-space: nowrap; letter-spacing: 0.05em; transition: 0.2s; }
+        #side-nav:hover .nav-label { opacity: 1; }
+
+        /* Map & Traffic Animation */
+        #map-container { background: #000; border-radius: 16px; overflow: hidden; position: relative; border: 1px solid var(--border); }
+        
+        .road { position: absolute; background: #161b22; z-index: 1; overflow: hidden; }
+        
+        /* Traffic Pulse Animation */
+        .traffic-line {
+            position: absolute; background: linear-gradient(90deg, transparent, var(--traffic-flow), transparent);
+            height: 2px; width: 60px; opacity: 0.8; animation: trafficFlow 4s linear infinite;
         }
-        #building-modal.active .modal-content { transform: scale(1); }
+        @keyframes trafficFlow {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(500%); }
+        }
 
-        .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
-        .stat-label { font-size: 11px; text-transform: uppercase; color: #8b949e; font-weight: 600; }
-        .stat-value { font-weight: 700; color: #fff; }
+        /* Building Refinement */
+        .building {
+            position: absolute; cursor: pointer; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10; border-radius: 4px; box-shadow: inset 0 0 15px rgba(255,255,255,0.05);
+            background: linear-gradient(145deg, rgba(22, 27, 34, 0.9), rgba(1, 4, 9, 0.9));
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .building:hover { 
+            border-color: var(--accent); 
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), inset 0 0 10px rgba(59, 130, 246, 0.2);
+            transform: translateY(-5px) scale(1.02);
+        }
+        .node-id { position: absolute; bottom: -18px; left: 0; font-size: 8px; font-weight: 800; color: #30363d; }
 
-        .progress-bg { height: 4px; width: 100px; background: #21262d; border-radius: 2px; position: relative; }
-        .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+        /* Dashboard Widgets */
+        .widget { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
     </style>
 </head>
 <body class="flex h-screen">
 
-    <aside id="side-nav" class="w-[70px] hover:w-[220px] transition-all duration-300 bg-[#010409] border-right border-white/5 flex flex-col z-50">
-        <div class="h-20 flex items-center justify-center border-b border-white/5"><i class="fas fa-satellite-dish text-blue-500"></i></div>
-        <div class="flex-1 space-y-4 mt-8 px-6 text-slate-500">
-            <div class="flex items-center gap-4 hover:text-blue-500 cursor-pointer"><i class="fas fa-th-large"></i> <span class="text-xs font-bold">DASHBOARD</span></div>
-            <div class="flex items-center gap-4 hover:text-blue-500 cursor-pointer"><i class="fas fa-map"></i> <span class="text-xs font-bold">GIS LAYERS</span></div>
+    <nav id="side-nav" class="flex flex-col">
+        <div class="h-24 flex items-center justify-center">
+            <i class="fas fa-layer-group text-blue-500 text-2xl"></i>
         </div>
-    </aside>
+        <div class="flex-1 space-y-2 mt-4">
+            <div class="nav-link active"><i class="fas fa-chart-line"></i><span class="nav-label">COMMAND</span></div>
+            <div class="nav-link"><i class="fas fa-car-side"></i><span class="nav-label">TRAFFIC ANALYTICS</span></div>
+            <div class="nav-link"><i class="fas fa-satellite"></i><span class="nav-label">GIS OVERLAYS</span></div>
+            <div class="nav-link"><i class="fas fa-shield-alt"></i><span class="nav-label">SECURITY</span></div>
+        </div>
+        <div class="p-8"><i class="fas fa-cog text-slate-700"></i></div>
+    </nav>
 
     <main class="flex-1 flex flex-col p-8 overflow-hidden">
         
-        <div class="flex justify-between items-start mb-8">
+        <header class="flex justify-between items-center mb-8">
             <div>
-                <h1 class="text-4xl font-black text-white italic tracking-tighter">NICE MÉRIDIA</h1>
-                <p class="text-[10px] text-blue-500 font-bold tracking-[0.4em] uppercase">Digital Twin Command Center</p>
+                <h1 class="text-3xl font-black text-white tracking-tighter italic">NICE MÉRIDIA</h1>
+                <p class="text-[10px] text-blue-500 font-bold tracking-[0.5em] uppercase">Nice Urban Twin | Real-Time Stream</p>
             </div>
-            <div class="glass px-4 py-2 rounded-lg text-right">
-                <p class="text-[9px] text-slate-500 uppercase font-bold">Network Status</p>
-                <p class="text-xs font-bold text-green-500">● 14 NODES ONLINE</p>
+            <div class="flex gap-6">
+                <div class="text-right">
+                    <p class="text-[9px] text-slate-500 font-bold uppercase">Traffic Flow</p>
+                    <p class="text-xl font-bold text-green-400">OPTIMAL</p>
+                </div>
+                <div class="bg-blue-600/10 border border-blue-500/20 px-4 py-2 rounded-lg">
+                    <p class="text-[9px] text-blue-400 font-bold uppercase">System Time</p>
+                    <p class="text-sm font-mono font-bold text-white">14:10:43 UTC</p>
+                </div>
             </div>
-        </div>
+        </header>
 
         <div class="flex-1 flex gap-8">
             
             <section class="w-80 flex flex-col gap-4">
-                <div class="glass p-5 rounded-xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-4">Neighborhood AQI</p>
-                    <div class="h-28"><canvas id="aqiChart"></canvas></div>
+                
+                <div class="widget">
+                    <div class="flex justify-between items-center mb-6">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Neighborhood AQI</span>
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <div class="h-32"><canvas id="aqiChart"></canvas></div>
+                    <div class="flex justify-between mt-4 text-[10px] font-bold">
+                        <span class="text-slate-500 uppercase">Level</span>
+                        <span class="text-white">14.4 PM2.5</span>
+                    </div>
                 </div>
-                <div class="glass p-5 rounded-xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-4">Grid Load Efficiency</p>
-                    <div class="h-28"><canvas id="gridChart"></canvas></div>
+
+                <div class="widget">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase block mb-6">Grid Load & Efficiency</span>
+                    <div class="h-32"><canvas id="gridChart"></canvas></div>
                 </div>
-                <div class="glass p-5 flex-1 rounded-xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-4">Resource Distribution</p>
-                    <div class="w-full h-40"><canvas id="distChart"></canvas></div>
+
+                <div class="widget flex-1">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase block mb-6">Occupancy Distribution</span>
+                    <div class="h-40 flex justify-center"><canvas id="occChart"></canvas></div>
+                    <div class="mt-6 space-y-3">
+                        <div class="flex justify-between text-[10px]">
+                            <span class="text-slate-500 uppercase">Residential</span>
+                            <span class="text-white font-bold">72%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-blue-500 h-full w-[72%]"></div></div>
+                    </div>
                 </div>
+
             </section>
 
-            <section id="map-viewport" class="flex-1 border border-white/5">
-                <div class="map-grid"></div>
+            <section id="map-container" class="flex-1">
+                <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(var(--accent) 0.5px, transparent 0.5px); background-size: 30px 30px;"></div>
                 
-                <div class="gis-road" style="left: 48%; top: 0; width: 40px; height: 100%;"></div>
-                <div class="gis-road" style="left: 0; top: 50%; width: 100%; height: 25px;"></div>
-                <div class="gis-water" style="left: 0; top: 85%; width: 100%; height: 60px;"></div>
-
-                <div class="building-node bg-blue-600" style="left: 15%; top: 35%; width: 65px; height: 65px;" 
-                     onclick="openModal('Palazzo Méridia', '88%', '21.4°C', '7.8k', 'Optimal')">
-                    <div class="node-label">Palazzo Méridia</div>
+                <div class="road" style="left: 45%; top: 0; width: 40px; height: 100%;">
+                    <div class="traffic-line" style="top: 20%; animation-delay: 0s;"></div>
+                    <div class="traffic-line" style="top: 50%; animation-delay: 1.5s; background: var(--traffic-heavy); width: 20px;"></div>
+                    <div class="traffic-line" style="top: 80%; animation-delay: 0.8s;"></div>
+                </div>
+                <div class="road" style="left: 0; top: 50%; width: 100%; height: 25px;">
+                    <div class="traffic-line" style="left: 10%; animation: trafficFlow 3s linear infinite;"></div>
+                    <div class="traffic-line" style="left: 60%; animation: trafficFlow 3s linear infinite reverse; background: #fff;"></div>
                 </div>
 
-                <div class="building-node bg-purple-600 border-purple-400" style="left: 55%; top: 20%; width: 50px; height: 50px;" 
-                     onclick="openModal('Hana Tower', '94%', '22.8°C', '12.4k', 'High Demand')">
-                    <div class="node-label" style="color:#a855f7">Hana Tower</div>
+                <div class="building" style="left: 15%; top: 30%; width: 80px; height: 80px;" onclick="showInspector('Palazzo Méridia')">
+                    <div class="p-2 text-[8px] font-bold text-blue-400">UNIT_01</div>
+                    <div class="node-id">PALAZZO_MERIDIA_06</div>
                 </div>
 
-                <div class="building-node bg-orange-600 border-orange-400" style="left: 72%; top: 55%; width: 85px; height: 45px;" 
-                     onclick="openModal('Joia Block C', '62%', '23.1°C', '5.4k', 'Standby')">
-                    <div class="node-label" style="color:#f59e0b">Joia Block C</div>
+                <div class="building" style="left: 60%; top: 15%; width: 60px; height: 60px; border-color: rgba(168, 85, 247, 0.3);" onclick="showInspector('Hana Tower')">
+                    <div class="p-2 text-[8px] font-bold text-purple-400">UNIT_02</div>
+                    <div class="node-id">HANA_TOWER_SITE</div>
+                </div>
+
+                <div class="building" style="left: 75%; top: 60%; width: 120px; height: 50px; border-color: rgba(245, 158, 11, 0.3);" onclick="showInspector('Joia Block C')">
+                    <div class="p-2 text-[8px] font-bold text-orange-400">UNIT_03</div>
+                    <div class="node-id">JOIA_BLOCK_C_OIN</div>
+                </div>
+
+                <div class="absolute bottom-6 left-8 flex gap-6 text-[9px] font-mono text-slate-500 bg-black/50 p-3 rounded border border-white/5">
+                    <span class="flex items-center gap-2"><div class="w-2 h-0.5 bg-green-500"></div> FLOW: NOMINAL</span>
+                    <span class="flex items-center gap-2"><div class="w-2 h-0.5 bg-red-500"></div> FLOW: CONGESTED</span>
                 </div>
             </section>
         </div>
     </main>
 
-    <div id="building-modal" onclick="closeModal(event)">
-        <div class="modal-content glass" onclick="event.stopPropagation()">
-            <div class="flex justify-between items-start mb-6">
-                <div>
-                    <h3 id="m-name" class="text-2xl font-black text-white italic tracking-tighter">BUILDING_NAME</h3>
-                    <p class="text-[9px] text-blue-500 font-bold uppercase tracking-widest">Structural Unit Node</p>
-                </div>
-                <button onclick="closeModal(null)" class="text-slate-500 hover:text-white transition-colors"><i class="fas fa-times"></i></button>
-            </div>
-
-            <div class="space-y-1">
-                <div class="stat-row">
-                    <span class="stat-label">Live Occupancy</span>
-                    <div class="flex items-center gap-3">
-                        <div class="progress-bg"><div id="m-occ-bar" class="progress-fill"></div></div>
-                        <span id="m-occ" class="stat-value">0%</span>
-                    </div>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Internal Temp</span>
-                    <span id="m-temp" class="stat-value">--</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Total Floor Area</span>
-                    <span id="m-area" class="stat-value">--</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Node Status</span>
-                    <span id="m-status" class="stat-value text-blue-400">NOMINAL</span>
-                </div>
-            </div>
-
-            <button onclick="closeModal(null)" class="w-full mt-8 py-3 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all">
-                Close Inspector
-            </button>
-        </div>
-    </div>
-
     <script>
-        // Charts
-        const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } };
-        
+        // Data Visualizations
+        Chart.defaults.color = '#484f58';
+        Chart.defaults.font.family = 'Inter';
+
         new Chart(document.getElementById('aqiChart'), {
             type: 'line',
-            data: { labels: [1,2,3,4,5], datasets: [{ data: [12, 19, 14, 18, 13], borderColor: '#3b82f6', tension: 0.4, borderWidth: 2, pointRadius: 0 }] },
-            options: commonOpts
+            data: { labels: [1,2,3,4,5,6], datasets: [{ data: [12, 14, 13, 16, 14.4, 13], borderColor: '#3b82f6', tension: 0.4, borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: 'rgba(59, 130, 246, 0.05)' }] },
+            options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } }, maintainAspectRatio: false }
         });
 
         new Chart(document.getElementById('gridChart'), {
             type: 'bar',
-            data: { labels: [1,2,3,4,5], datasets: [{ data: [40, 60, 80, 50, 90], backgroundColor: '#21262d', hoverBackgroundColor: '#3b82f6', borderRadius: 4 }] },
-            options: commonOpts
+            data: { labels: ['M','T','W','T','F','S'], datasets: [{ data: [65, 80, 72, 90, 85, 60], backgroundColor: '#161b22', hoverBackgroundColor: '#3b82f6', borderRadius: 4 }] },
+            options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 8 } } }, y: { display: false } }, maintainAspectRatio: false }
         });
 
-        new Chart(document.getElementById('distChart'), {
+        new Chart(document.getElementById('occChart'), {
             type: 'doughnut',
-            data: { labels: ['Water', 'Energy', 'Waste'], datasets: [{ data: [40, 35, 25], backgroundColor: ['#1f6feb', '#3b82f6', '#161b22'], borderWidth: 0, cutout: '80%' }] },
-            options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b949e', font: { size: 9 } } } } }
+            data: { labels: ['Res', 'Com', 'Public'], datasets: [{ data: [50, 30, 20], backgroundColor: ['#3b82f6', '#1e293b', '#0d1117'], borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', cutout: '85%' }] },
+            options: { plugins: { legend: { display: false } }, maintainAspectRatio: false }
         });
 
-        // Modal Logic
-        function openModal(name, occ, temp, area, status) {
-            document.getElementById('m-name').innerText = name.toUpperCase();
-            document.getElementById('m-occ').innerText = occ;
-            document.getElementById('m-occ-bar').style.width = occ;
-            document.getElementById('m-temp').innerText = temp;
-            document.getElementById('m-area').innerText = area + " m²";
-            document.getElementById('m-status').innerText = status.toUpperCase();
-            
-            const modal = document.getElementById('building-modal');
-            modal.style.display = 'flex';
-            setTimeout(() => modal.classList.add('active'), 10);
-        }
-
-        function closeModal(e) {
-            if (e && e.target !== document.getElementById('building-modal')) return;
-            const modal = document.getElementById('building-modal');
-            modal.classList.remove('active');
-            setTimeout(() => modal.style.display = 'none', 300);
+        function showInspector(name) {
+            console.log("Inspecting Node:", name);
+            // This would trigger the polished modal from the previous step
         }
     </script>
 </body>
