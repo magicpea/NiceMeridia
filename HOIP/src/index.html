@@ -1,204 +1,335 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nice Méridia | Command Center</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        
-        :root {
-            --bg: #0d1117;
-            --card: #161b22;
-            --accent: #3b82f6;
-            --border: rgba(255, 255, 255, 0.08);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Méridia District — Digital Twin</title>
 
-        body { background-color: var(--bg); color: #c9d1d9; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .glass { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(10px); }
-        
-        /* Map Layers */
-        #map-viewport { background: #080808; position: relative; border-radius: 12px; overflow: hidden; }
-        .map-grid { position: absolute; inset: 0; background-image: radial-gradient(#21262d 1px, transparent 1px); background-size: 30px 30px; }
-        .gis-road { position: absolute; background: #21262d; z-index: 1; }
-        .gis-water { position: absolute; background: rgba(59, 130, 246, 0.1); border-bottom: 2px solid #1f6feb; z-index: 1; }
+  <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.1.0/uicons-regular-straight/css/uicons-regular-straight.css'>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
-        /* Building Nodes */
-        .building-node {
-            position: absolute; border: 1px solid #fff; cursor: pointer;
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 10;
-        }
-        .building-node:hover { transform: scale(1.1); box-shadow: 0 0 25px var(--accent); z-index: 50; }
-        .node-label { position: absolute; top: -20px; left: 0; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; white-space: nowrap; }
+  <script type="importmap">
+  {
+    "imports": { 
+      "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+    }
+  }
+  </script>
 
-        /* Custom Polished Modal */
-        #building-modal {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-            z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: 0.3s;
-        }
-        #building-modal.active { display: flex; opacity: 1; }
-        .modal-content {
-            width: 400px; padding: 2rem; border-radius: 16px; transform: scale(0.9); transition: 0.3s;
-            border-top: 4px solid var(--accent); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        #building-modal.active .modal-content { transform: scale(1); }
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;700&display=swap');
+    
+    body { margin:0; height: 100vh; overflow:hidden; background: #060812; color: #94a3b8; font-family:'Inter', sans-serif; display: flex; flex-direction: column; }
+    #three-container { flex: 1; position: relative; width: 100%; cursor: crosshair; z-index: 10; overflow: hidden; }
+    
+    .nav-sidebar {
+      position: fixed; left: 0; top: 0; height: 100vh; width: 70px;
+      background: #0f172a; border-right: 1px solid rgba(56, 189, 248, 0.2);
+      display: flex; flex-direction: column; align-items: center; padding-top: 20px; z-index: 600;
+    }
+    .nav-item {
+      width: 50px; height: 50px; margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 12px; cursor: pointer; transition: all 0.3s ease; color: #64748b;
+    }
+    .nav-item.active { color: #38bdf8; background: rgba(56, 189, 248, 0.1); box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+    
+    .data-panel {
+      position: fixed; left: 70px; top: 0; height: 100vh; width: 360px;
+      background: rgba(10, 15, 28, 0.95); border-right: 1px solid rgba(56, 189, 248, 0.1);
+      backdrop-filter: blur(20px); z-index: 500; padding: 30px; overflow-y: auto;
+    }
 
-        .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
-        .stat-label { font-size: 11px; text-transform: uppercase; color: #8b949e; font-weight: 600; }
-        .stat-value { font-weight: 700; color: #fff; }
+    #block-popup { 
+      position: fixed; bottom: 0; left: 430px; right: 0; height: 300px;
+      display: none; background: rgba(15, 23, 42, 0.98); border-top: 2px solid #f59e0b; 
+      padding: 25px 40px; z-index: 700; box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+      backdrop-filter: blur(20px);
+    }
 
-        .progress-bg { height: 4px; width: 100px; background: #21262d; border-radius: 2px; position: relative; }
-        .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
-    </style>
+    .stat-card { background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
+    .label { color: #64748b; font-size: 8px; text-transform: uppercase; font-family:'DM Mono'; margin-bottom: 2px; }
+    
+    .hl-amber { color: #f59e0b; }
+    .hl-blue { color: #60a5fa; }
+    .hl-green { color: #34d399; }
+
+    #loading-overlay { position: fixed; inset: 0; background: #060812; z-index: 1000; display: flex; align-items: center; justify-content: center; color: #38bdf8; font-family: 'DM Mono'; }
+  </style>
 </head>
-<body class="flex h-screen">
+<body>
 
-    <aside id="side-nav" class="w-[70px] hover:w-[220px] transition-all duration-300 bg-[#010409] border-right border-white/5 flex flex-col z-50">
-        <div class="h-20 flex items-center justify-center border-b border-white/5"><i class="fas fa-satellite-dish text-blue-500"></i></div>
-        <div class="flex-1 space-y-4 mt-8 px-6 text-slate-500">
-            <div class="flex items-center gap-4 hover:text-blue-500 cursor-pointer"><i class="fas fa-th-large"></i> <span class="text-xs font-bold">DASHBOARD</span></div>
-            <div class="flex items-center gap-4 hover:text-blue-500 cursor-pointer"><i class="fas fa-map"></i> <span class="text-xs font-bold">GIS LAYERS</span></div>
-        </div>
-    </aside>
+<div id="loading-overlay">SYNCHRONIZING DISTRICT DATA...</div>
+<div id="three-container"></div>
 
-    <main class="flex-1 flex flex-col p-8 overflow-hidden">
-        
-        <div class="flex justify-between items-start mb-8">
-            <div>
-                <h1 class="text-4xl font-black text-white italic tracking-tighter">NICE MÉRIDIA</h1>
-                <p class="text-[10px] text-blue-500 font-bold tracking-[0.4em] uppercase">Digital Twin Command Center</p>
-            </div>
-            <div class="glass px-4 py-2 rounded-lg text-right">
-                <p class="text-[9px] text-slate-500 uppercase font-bold">Network Status</p>
-                <p class="text-xs font-bold text-green-500">● 14 NODES ONLINE</p>
-            </div>
-        </div>
+<nav class="nav-sidebar">
+  <div class="nav-item active" id="btn-overall" onclick="switchTab('overall')"><i class="fi fi-rs-apps"></i></div>
+  <div class="nav-item" id="btn-mobility" onclick="switchTab('mobility')"><i class="fi fi-rs-biking"></i></div>
+  <div class="nav-item" id="btn-energy" onclick="switchTab('energy')"><i class="fi fi-rs-bolt"></i></div>
+  <div class="nav-item" id="btn-environment" onclick="switchTab('environment')"><i class="fi fi-rs-leaf"></i></div>
+</nav>
 
-        <div class="flex-1 flex gap-8">
-            
-            <section class="w-80 flex flex-col gap-4">
-                <div class="glass p-5 rounded-xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-4">Neighborhood AQI</p>
-                    <div class="h-28"><canvas id="aqiChart"></canvas></div>
-                </div>
-                <div class="glass p-5 rounded-xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-4">Grid Load Efficiency</p>
-                    <div class="h-28"><canvas id="gridChart"></canvas></div>
-                </div>
-                <div class="glass p-5 flex-1 rounded-xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-4">Resource Distribution</p>
-                    <div class="w-full h-40"><canvas id="distChart"></canvas></div>
-                </div>
-            </section>
+<aside class="data-panel">
+  <div id="tab-content-overall">
+    <h1 class="text-white text-xl font-bold mb-1">Neighborhood Overview</h1>
+    <p class="text-[10px] font-mono text-sky-400 mb-8 uppercase">Aggregate Data</p>
+    <div class="stat-card mb-4"><div class="label">Total Population</div><div class="text-xl font-bold hl-blue font-mono">7,842</div></div>
+    <div class="stat-card mb-4"><div class="label">Number of Residential Buildings</div><div class="text-xl font-bold hl-green font-mono">Operational</div></div>
+  </div>
 
-            <section id="map-viewport" class="flex-1 border border-white/5">
-                <div class="map-grid"></div>
-                
-                <div class="gis-road" style="left: 48%; top: 0; width: 40px; height: 100%;"></div>
-                <div class="gis-road" style="left: 0; top: 50%; width: 100%; height: 25px;"></div>
-                <div class="gis-water" style="left: 0; top: 85%; width: 100%; height: 60px;"></div>
+  <div id="tab-content-mobility" class="hidden">
+    <h1 class="text-white text-xl font-bold mb-1">Mobility Overview</h1>
+    <p class="text-[10px] font-mono text-sky-400 mb-8 uppercase">Aggregate Data</p>
+    <div class="stat-card mb-4"><div class="label">Proposed Transport Mode Share</div><br><div style="height:220px"><canvas id="mobilityChart"></canvas></div></div>
+  </div>
 
-                <div class="building-node bg-blue-600" style="left: 15%; top: 35%; width: 65px; height: 65px;" 
-                     onclick="openModal('Palazzo Méridia', '88%', '21.4°C', '7.8k', 'Optimal')">
-                    <div class="node-label">Palazzo Méridia</div>
-                </div>
-
-                <div class="building-node bg-purple-600 border-purple-400" style="left: 55%; top: 20%; width: 50px; height: 50px;" 
-                     onclick="openModal('Hana Tower', '94%', '22.8°C', '12.4k', 'High Demand')">
-                    <div class="node-label" style="color:#a855f7">Hana Tower</div>
-                </div>
-
-                <div class="building-node bg-orange-600 border-orange-400" style="left: 72%; top: 55%; width: 85px; height: 45px;" 
-                     onclick="openModal('Joia Block C', '62%', '23.1°C', '5.4k', 'Standby')">
-                    <div class="node-label" style="color:#f59e0b">Joia Block C</div>
-                </div>
-            </section>
-        </div>
-    </main>
-
-    <div id="building-modal" onclick="closeModal(event)">
-        <div class="modal-content glass" onclick="event.stopPropagation()">
-            <div class="flex justify-between items-start mb-6">
-                <div>
-                    <h3 id="m-name" class="text-2xl font-black text-white italic tracking-tighter">BUILDING_NAME</h3>
-                    <p class="text-[9px] text-blue-500 font-bold uppercase tracking-widest">Structural Unit Node</p>
-                </div>
-                <button onclick="closeModal(null)" class="text-slate-500 hover:text-white transition-colors"><i class="fas fa-times"></i></button>
-            </div>
-
-            <div class="space-y-1">
-                <div class="stat-row">
-                    <span class="stat-label">Live Occupancy</span>
-                    <div class="flex items-center gap-3">
-                        <div class="progress-bg"><div id="m-occ-bar" class="progress-fill"></div></div>
-                        <span id="m-occ" class="stat-value">0%</span>
-                    </div>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Internal Temp</span>
-                    <span id="m-temp" class="stat-value">--</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Total Floor Area</span>
-                    <span id="m-area" class="stat-value">--</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Node Status</span>
-                    <span id="m-status" class="stat-value text-blue-400">NOMINAL</span>
-                </div>
-            </div>
-
-            <button onclick="closeModal(null)" class="w-full mt-8 py-3 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all">
-                Close Inspector
-            </button>
-        </div>
+  <div id="tab-content-energy" class="hidden">
+    <h1 class="text-white text-xl font-bold mb-1">Energy Overview</h1>
+    <p class="text-[10px] font-mono text-sky-400 mb-8 uppercase">Aggregate Data</p>
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      <div class="stat-card"><div class="label">Annual PV</div><div class="text-lg font-bold hl-amber font-mono">9,313 MWh</div></div>
+      <div class="stat-card"><div class="label">Annual Demand</div><div class="text-lg font-bold hl-blue font-mono">51,524 MWh</div></div>
+      <div class="stat-card"><div class="label">Self-Suff.</div><div class="text-lg font-bold hl-green font-mono">18.1%</div></div>
+      <div class="stat-card"><div class="label">Residents</div><div class="text-lg font-bold font-mono text-white">7,842</div></div>
     </div>
+    <div style="height:200px" class="bg-slate-900/50 p-2 rounded-lg"><canvas id="aggEnergyChart"></canvas></div>
+  </div>
 
-    <script>
-        // Charts
-        const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } };
-        
-        new Chart(document.getElementById('aqiChart'), {
-            type: 'line',
-            data: { labels: [1,2,3,4,5], datasets: [{ data: [12, 19, 14, 18, 13], borderColor: '#3b82f6', tension: 0.4, borderWidth: 2, pointRadius: 0 }] },
-            options: commonOpts
+  <div id="tab-content-environment" class="hidden">
+    <h1 class="text-white text-xl font-bold mb-1">Environment Overview</h1>
+    <p class="text-[10px] font-mono text-sky-400 mb-8 uppercase">Aggregate Data</p>
+    <div class="stat-card mb-4"><div class="label">Air Quality Index</div><div class="text-xl font-bold hl-green font-mono">32 (Good)</div></div>
+  </div>
+</aside>
+
+<div id="block-popup">
+  <div class="flex h-full gap-10 items-center">
+    <div class="w-1/5">
+      <h2 id="p-name" class="text-white font-bold text-2xl uppercase mb-3 tracking-tighter">Block #</h2>
+      <div class="stat-card border-amber-500/20 bg-amber-500/5 mb-3">
+        <div class="label">Self-Sufficiency</div>
+        <div id="p-suff" class="text-4xl font-bold hl-amber font-mono">--%</div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+         <div class="stat-card"><div class="label">Residents</div><div id="p-res" class="text-sm font-bold text-white font-mono">--</div></div>
+         <div class="stat-card"><div class="label">Peak kWp</div><div id="p-kwp" class="text-sm font-bold hl-amber font-mono">--</div></div>
+      </div>
+    </div>
+    
+    <div class="w-4/5 flex flex-col h-full">
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex gap-6">
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#f59e0b]"></div><span class="text-[10px] uppercase font-mono">PV Gen</span></div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#60a5fa]"></div><span class="text-[10px] uppercase font-mono">Res.</span></div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#a78bfa]"></div><span class="text-[10px] uppercase font-mono">Office</span></div>
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-sm bg-[#34d399]"></div><span class="text-[10px] uppercase font-mono">Retail</span></div>
+        </div>
+        <button onclick="document.getElementById('block-popup').style.display='none'" class="text-gray-500 hover:text-white text-[10px] font-mono border border-white/10 px-2 py-1 rounded">CLOSE [ESC]</button>
+      </div>
+      <div class="flex-grow bg-slate-900/40 rounded-xl p-4"><canvas id="popupChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+let activeTab = 'overall';
+let hoveredObject = null;
+let selectedObject = null;
+const interactables = [];
+
+const BLOCKS = [
+  {"type": "building", "block": "A-152", "residents": 465, "kwp": 174.4, "annual_pv": 264.8, "annual_dem": 3.1, "self_suff": 8.6, "summer": [{"pv":0.0,"res":170.5,"off":15.3,"ret":2.8,"dem":188.6},{"pv":20.0,"res":204.6,"off":45.8,"ret":8.4,"dem":258.9},{"pv":880.0,"res":194.9,"off":213.7,"ret":36.5,"dem":445.1},{"pv":150.0,"res":292.3,"off":106.8,"ret":30.9,"dem":430.1},{"pv":0.0,"res":194.9,"off":15.3,"ret":4.5,"dem":214.7}]},
+  {"type": "building", "block": "B-094", "residents": 546, "kwp": 129.8, "annual_pv": 197.1, "annual_dem": 3.0, "self_suff": 6.6, "summer": [{"pv":0.0,"res":200.1,"off":9.9,"ret":2.5,"dem":212.6},{"pv":14.9,"res":240.1,"off":29.8,"ret":7.6,"dem":277.6},{"pv":654.7,"res":228.7,"off":139.2,"ret":33.0,"dem":400.9},{"pv":111.6,"res":343.0,"off":69.6,"ret":28.0,"dem":440.6},{"pv":0.0,"res":228.7,"off":9.9,"ret":4.1,"dem":242.7}]}
+];
+
+// HIGHLIGHT MATERIALS
+const MATS = {
+  default_street: new THREE.MeshStandardMaterial({ color: 0x242f42, roughness: 0.8 }),
+  default_building: new THREE.MeshStandardMaterial({ color: 0x1e293b, transparent: true, opacity: 0.7, emissive: 0x38bdf8, emissiveIntensity: 0.05 }),
+  leaf_green: new THREE.MeshStandardMaterial({ color: 0x2d6a4f, emissive: 0x1b4332, emissiveIntensity: 0.5 }),
+  light_green: new THREE.MeshStandardMaterial({ color: 0x95d5b2, emissive: 0x74c69d, emissiveIntensity: 0.8, transparent: true, opacity: 0.95 })
+};
+
+let charts = {};
+
+const surplusShadingPlugin = {
+  id: 'surplusShading',
+  beforeDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea) return;
+    const xScale = scales.x;
+    const yScale = scales.y;
+    const datasets = chart.data.datasets;
+    const pvSet = datasets.find(ds => ds.label === 'PV')?.data;
+    const demSet = datasets.find(ds => ds.label === 'Demand')?.data;
+    if(!pvSet || !demSet) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+    ctx.clip();
+    for (let i = 0; i < pvSet.length - 1; i++) {
+      const x1 = xScale.getPixelForValue(i);
+      const x2 = xScale.getPixelForValue(i + 1);
+      const isSurplus = pvSet[i] > demSet[i];
+      ctx.fillStyle = isSurplus ? 'rgba(52, 211, 153, 0.2)' : 'rgba(248, 113, 113, 0.1)';
+      const yTop1 = yScale.getPixelForValue(Math.max(pvSet[i], demSet[i]));
+      const yBot1 = yScale.getPixelForValue(Math.min(pvSet[i], demSet[i]));
+      const yTop2 = yScale.getPixelForValue(Math.max(pvSet[i+1], demSet[i+1]));
+      const yBot2 = yScale.getPixelForValue(Math.min(pvSet[i+1], demSet[i+1]));
+      ctx.beginPath();
+      ctx.moveTo(x1, yTop1); ctx.lineTo(x2, yTop2); ctx.lineTo(x2, yBot2); ctx.lineTo(x1, yBot1);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+};
+
+window.switchTab = (tab) => {
+  activeTab = tab;
+  ['overall', 'mobility', 'energy', 'environment'].forEach(t => {
+    document.getElementById(`tab-content-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`btn-${t}`).classList.toggle('active', t === tab);
+  });
+  if(tab === 'energy') initAggregateEnergy();
+  if(tab === 'mobility') initMobilityChart();
+  refreshHighlights();
+};
+
+function refreshHighlights() {
+  interactables.forEach(obj => {
+    const data = obj.userData;
+    if (data.type === 'building' && (obj === hoveredObject || obj === selectedObject)) {
+        obj.material = MATS.light_green;
+        return;
+    }
+    if (activeTab === 'mobility' && data.type === 'street') {
+      obj.material = MATS.leaf_green;
+    } else if (activeTab === 'energy' && data.type === 'building') {
+      obj.material = MATS.leaf_green;
+    } else {
+      obj.material = data.type === 'street' ? MATS.default_street : MATS.default_building;
+    }
+  });
+}
+
+function initMobilityChart() {
+  if(charts.mob) charts.mob.destroy();
+  charts.mob = new Chart(document.getElementById('mobilityChart'), {
+    type: 'doughnut',
+    data: { labels: ['Car', 'Pedestrian', 'Tram', 'Bike'], datasets: [{ data: [35, 25, 20, 20], backgroundColor: ['#34d399', '#38bdf8', '#a78bfa', '#f59e0b'], borderWidth: 0 }]},
+    options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 10, family: 'DM Mono' } } } } }
+  });
+}
+
+function initAggregateEnergy() {
+  if(charts.agg) charts.agg.destroy();
+  charts.agg = new Chart(document.getElementById('aggEnergyChart'), {
+    type: 'line',
+    plugins: [surplusShadingPlugin],
+    data: {
+      labels: ['00:00','06:00','12:00','18:00','23:00'],
+      datasets: [
+        { label: 'PV', data: [0, 1200, 9500, 2100, 0], borderColor: '#f59e0b', borderWidth: 3, tension: 0.4, pointRadius: 0 },
+        { label: 'Demand', data: [2500, 3400, 8800, 6800, 2900], borderColor: 'rgba(255,255,255,0.2)', borderDash: [5, 5], borderWidth: 1, tension: 0.4, pointRadius: 0 }
+      ]
+    },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { color: '#475569', font: { family: 'DM Mono', size: 9 } } } } }
+  });
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060812);
+const container = document.getElementById('three-container');
+const camera = new THREE.PerspectiveCamera(35, container.clientWidth/container.clientHeight, 1, 15000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(container.clientWidth, container.clientHeight);
+container.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+camera.position.set(1800, 2400, 2800); 
+controls.target.set(-1400, 0, 400); 
+controls.update();
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+const loader = new GLTFLoader();
+loader.load('3D_Street.glb', (gltf) => {
+  const streetGroup = gltf.scene;
+  streetGroup.position.set(-1400, 0, 400);
+  scene.add(streetGroup);
+  streetGroup.traverse(child => {
+    if(child.isMesh) {
+      child.material = MATS.default_street;
+      child.userData = { type: 'street' };
+      interactables.push(child);
+    }
+  });
+});
+
+loader.load('marie test.glb', (gltf) => {
+  const buildingGroup = gltf.scene;
+  buildingGroup.position.set(-1400, 2, 400);
+  scene.add(buildingGroup);
+  buildingGroup.traverse(child => {
+    if(child.isMesh) {
+      child.material = MATS.default_building;
+      child.userData = BLOCKS[Math.floor(Math.random() * BLOCKS.length)];
+      interactables.push(child);
+    }
+  });
+  document.getElementById('loading-overlay').remove();
+});
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener('mousemove', (e) => {
+  const rect = container.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactables);
+  if (hits.length > 0) {
+    if (hoveredObject !== hits[0].object) { hoveredObject = hits[0].object; refreshHighlights(); }
+  } else {
+    if (hoveredObject !== null) { hoveredObject = null; refreshHighlights(); }
+  }
+});
+
+window.addEventListener('mousedown', (e) => {
+  if (e.target.closest('aside') || e.target.closest('nav') || e.target.closest('#block-popup')) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(interactables);
+  if(hits.length > 0) {
+    selectedObject = hits[0].object;
+    refreshHighlights();
+    const data = hits[0].object.userData;
+    if(data.type === 'building') {
+        document.getElementById('block-popup').style.display = 'block';
+        document.getElementById('p-name').innerText = `Block ${data.block}`;
+        document.getElementById('p-res').innerText = data.residents;
+        document.getElementById('p-kwp').innerText = data.kwp;
+        document.getElementById('p-suff').innerText = data.self_suff + "%";
+        if(charts.pop) charts.pop.destroy();
+        charts.pop = new Chart(document.getElementById('popupChart'), {
+            type: 'line', plugins: [surplusShadingPlugin],
+            data: { labels: ['00','06','12','18','23'], datasets: [
+                { label: 'PV', data: data.summer.map(d=>d.pv), borderColor: '#f59e0b', tension: 0.4, borderWidth: 3, pointRadius: 0 },
+                { label: 'Demand', data: data.summer.map(d=>d.dem), borderColor: 'rgba(255,255,255,0.4)', tension: 0.4, pointRadius: 0 }
+            ]},
+            options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'DM Mono', size: 10 } } } } }
         });
+    }
+  } else { selectedObject = null; refreshHighlights(); }
+});
 
-        new Chart(document.getElementById('gridChart'), {
-            type: 'bar',
-            data: { labels: [1,2,3,4,5], datasets: [{ data: [40, 60, 80, 50, 90], backgroundColor: '#21262d', hoverBackgroundColor: '#3b82f6', borderRadius: 4 }] },
-            options: commonOpts
-        });
-
-        new Chart(document.getElementById('distChart'), {
-            type: 'doughnut',
-            data: { labels: ['Water', 'Energy', 'Waste'], datasets: [{ data: [40, 35, 25], backgroundColor: ['#1f6feb', '#3b82f6', '#161b22'], borderWidth: 0, cutout: '80%' }] },
-            options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b949e', font: { size: 9 } } } } }
-        });
-
-        // Modal Logic
-        function openModal(name, occ, temp, area, status) {
-            document.getElementById('m-name').innerText = name.toUpperCase();
-            document.getElementById('m-occ').innerText = occ;
-            document.getElementById('m-occ-bar').style.width = occ;
-            document.getElementById('m-temp').innerText = temp;
-            document.getElementById('m-area').innerText = area + " m²";
-            document.getElementById('m-status').innerText = status.toUpperCase();
-            
-            const modal = document.getElementById('building-modal');
-            modal.style.display = 'flex';
-            setTimeout(() => modal.classList.add('active'), 10);
-        }
-
-        function closeModal(e) {
-            if (e && e.target !== document.getElementById('building-modal')) return;
-            const modal = document.getElementById('building-modal');
-            modal.classList.remove('active');
-            setTimeout(() => modal.style.display = 'none', 300);
-        }
-    </script>
+function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+animate();
+</script>
 </body>
 </html>

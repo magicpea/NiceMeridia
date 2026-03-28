@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParcMéridia — Block Energy Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e28;
+    --border: rgba(255,255,255,0.07);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.15);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.12);
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.12);
+    --purple: #a78bfa;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --surplus: rgba(52,211,153,0.2);
+    --deficit: rgba(248,113,113,0.08);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+  }
+
+  .header {
+    padding: 2rem 2.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .header-left h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+
+  .header-left p {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 0.3rem;
+    letter-spacing: 0.05em;
+  }
+
+  .season-toggle {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .season-btn {
+    padding: 0.45rem 1.1rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .season-btn.active {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: #000;
+    font-weight: 500;
+  }
+
+  .season-btn:not(.active):hover {
+    border-color: rgba(255,255,255,0.2);
+    color: var(--text);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: calc(100vh - 95px);
+  }
+
+  /* BLOCK LIST */
+  .block-list {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1rem 0;
+  }
+
+  .block-list::-webkit-scrollbar { width: 4px; }
+  .block-list::-webkit-scrollbar-track { background: transparent; }
+  .block-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .block-item {
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .block-item:hover { background: var(--surface); }
+
+  .block-item.active {
+    background: var(--surface2);
+    border-left-color: var(--amber);
+  }
+
+  .block-num {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #fff;
+    min-width: 28px;
+  }
+
+  .block-meta {
+    flex: 1;
+  }
+
+  .block-meta-res {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .block-suff {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  .suff-low { color: var(--red); background: rgba(248,113,113,0.1); }
+  .suff-mid { color: var(--amber); background: var(--amber-dim); }
+  .suff-high { color: var(--green); background: var(--green-dim); }
+
+  /* MAIN PANEL */
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .block-header {
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .block-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 1rem;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+
+  .stat-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .stat-val {
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .chart-area {
+    flex: 1;
+    padding: 1.5rem 2rem;
+    position: relative;
+    min-height: 0;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 100%;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.75rem 2rem;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .surplus-badge {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .surplus-info {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .surplus-info span {
+    background: var(--green-dim);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+  }
+
+  .no-surplus {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--red);
+    background: rgba(248,113,113,0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>ParcMéridia — Block Energy Profile</h1>
+    <p>HOURLY PV GENERATION vs DEMAND · 18 BLOCKS · 6,123.8 kWp TOTAL</p>
+  </div>
+  <div class="season-toggle">
+    <button class="season-btn active" onclick="setSeason('summer')">☀ SUMMER</button>
+    <button class="season-btn" onclick="setSeason('winter')">❄ WINTER</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="block-list" id="blockList"></div>
+  <div class="main-panel">
+    <div class="block-header">
+      <div class="block-title" id="blockTitle">Block 1</div>
+      <div class="stats-row" id="statsRow"></div>
+    </div>
+    <div class="chart-area">
+      <div class="chart-wrap">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#f59e0b"></div>
+        PV generation
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#60a5fa"></div>
+        Residential
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#a78bfa"></div>
+        Office
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#34d399"></div>
+        Retail
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:rgba(52,211,153,0.3); border: 1px solid #34d399"></div>
+        Surplus zone (PV > demand)
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:rgba(248,113,113,0.2); border: 1px solid #f87171"></div>
+        Deficit zone (grid needed)
+      </div>
+      <div class="surplus-badge">
+        <div id="surplusInfo"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BLOCKS = [{"block": 1, "residents": 465, "kwp": 174.4, "annual_pv": 264865, "annual_dem": 3097575, "self_suff": 8.6, "res_share": 57.4, "off_share": 36.0, "ret_share": 6.6, "summer": [{"h": 0, "pv": 0.0, "res": 170.5, "off": 15.3, "ret": 2.8, "dem": 188.6}, {"h": 1, "pv": 0.0, "res": 146.2, "off": 15.3, "ret": 2.8, "dem": 164.2}, {"h": 2, "pv": 0.0, "res": 136.4, "off": 15.3, "ret": 2.8, "dem": 154.5}, {"h": 3, "pv": 0.0, "res": 131.6, "off": 15.3, "ret": 2.8, "dem": 149.6}, {"h": 4, "pv": 0.0, "res": 136.4, "off": 15.3, "ret": 2.8, "dem": 154.5}, {"h": 5, "pv": 0.0, "res": 155.9, "off": 30.5, "ret": 5.6, "dem": 192.1}, {"h": 6, "pv": 20.0, "res": 204.6, "off": 45.8, "ret": 8.4, "dem": 258.9}, {"h": 7, "pv": 80.0, "res": 268.0, "off": 76.3, "ret": 14.0, "dem": 358.3}, {"h": 8, "pv": 200.0, "res": 233.9, "off": 198.4, "ret": 33.7, "dem": 466.0}, {"h": 9, "pv": 400.0, "res": 194.9, "off": 228.9, "ret": 39.3, "dem": 463.1}, {"h": 10, "pv": 600.0, "res": 185.2, "off": 244.2, "ret": 42.1, "dem": 471.5}, {"h": 11, "pv": 780.0, "res": 185.2, "off": 250.3, "ret": 43.8, "dem": 479.3}, {"h": 12, "pv": 880.0, "res": 194.9, "off": 213.7, "ret": 36.5, "dem": 445.1}, {"h": 13, "pv": 920.0, "res": 185.2, "off": 228.9, "ret": 38.2, "dem": 452.3}, {"h": 14, "pv": 880.0, "res": 180.3, "off": 244.2, "ret": 39.3, "dem": 463.8}, {"h": 15, "pv": 780.0, "res": 185.2, "off": 250.3, "ret": 40.4, "dem": 475.9}, {"h": 16, "pv": 580.0, "res": 204.6, "off": 228.9, "ret": 39.3, "dem": 472.9}, {"h": 17, "pv": 350.0, "res": 253.4, "off": 183.1, "ret": 36.5, "dem": 473.0}, {"h": 18, "pv": 150.0, "res": 292.3, "off": 106.8, "ret": 30.9, "dem": 430.1}, {"h": 19, "pv": 40.0, "res": 302.1, "off": 61.0, "ret": 25.3, "dem": 388.4}, {"h": 20, "pv": 0.0, "res": 282.6, "off": 45.8, "ret": 19.7, "dem": 348.0}, {"h": 21, "pv": 0.0, "res": 253.4, "off": 30.5, "ret": 11.2, "dem": 295.1}, {"h": 22, "pv": 0.0, "res": 219.3, "off": 24.4, "ret": 6.7, "dem": 250.4}, {"h": 23, "pv": 0.0, "res": 194.9, "off": 15.3, "ret": 4.5, "dem": 214.7}], "winter": [{"h": 0, "pv": 0.0, "res": 170.5, "off": 15.3, "ret": 2.8, "dem": 188.6}, {"h": 1, "pv": 0.0, "res": 146.2, "off": 15.3, "ret": 2.8, "dem": 164.2}, {"h": 2, "pv": 0.0, "res": 136.4, "off": 15.3, "ret": 2.8, "dem": 154.5}, {"h": 3, "pv": 0.0, "res": 131.6, "off": 15.3, "ret": 2.8, "dem": 149.6}, {"h": 4, "pv": 0.0, "res": 136.4, "off": 15.3, "ret": 2.8, "dem": 154.5}, {"h": 5, "pv": 0.0, "res": 155.9, "off": 30.5, "ret": 5.6, "dem": 192.1}, {"h": 6, "pv": 10.0, "res": 204.6, "off": 45.8, "ret": 8.4, "dem": 258.9}, {"h": 7, "pv": 40.0, "res": 268.0, "off": 76.3, "ret": 14.0, "dem": 358.3}, {"h": 8, "pv": 100.0, "res": 233.9, "off": 198.4, "ret": 33.7, "dem": 466.0}, {"h": 9, "pv": 200.0, "res": 194.9, "off": 228.9, "ret": 39.3, "dem": 463.1}, {"h": 10, "pv": 300.0, "res": 185.2, "off": 244.2, "ret": 42.1, "dem": 471.5}, {"h": 11, "pv": 390.0, "res": 185.2, "off": 250.3, "ret": 43.8, "dem": 479.3}, {"h": 12, "pv": 440.0, "res": 194.9, "off": 213.7, "ret": 36.5, "dem": 445.1}, {"h": 13, "pv": 460.0, "res": 185.2, "off": 228.9, "ret": 38.2, "dem": 452.3}, {"h": 14, "pv": 440.0, "res": 180.3, "off": 244.2, "ret": 39.3, "dem": 463.8}, {"h": 15, "pv": 390.0, "res": 185.2, "off": 250.3, "ret": 40.4, "dem": 475.9}, {"h": 16, "pv": 290.0, "res": 204.6, "off": 228.9, "ret": 39.3, "dem": 472.9}, {"h": 17, "pv": 175.0, "res": 253.4, "off": 183.1, "ret": 36.5, "dem": 473.0}, {"h": 18, "pv": 75.0, "res": 292.3, "off": 106.8, "ret": 30.9, "dem": 430.1}, {"h": 19, "pv": 20.0, "res": 302.1, "off": 61.0, "ret": 25.3, "dem": 388.4}, {"h": 20, "pv": 0.0, "res": 282.6, "off": 45.8, "ret": 19.7, "dem": 348.0}, {"h": 21, "pv": 0.0, "res": 253.4, "off": 30.5, "ret": 11.2, "dem": 295.1}, {"h": 22, "pv": 0.0, "res": 219.3, "off": 24.4, "ret": 6.7, "dem": 250.4}, {"h": 23, "pv": 0.0, "res": 194.9, "off": 15.3, "ret": 4.5, "dem": 214.7}]}, {"block": 2, "residents": 546, "kwp": 129.8, "annual_pv": 197077, "annual_dem": 2997921, "self_suff": 6.6, "res_share": 69.6, "off_share": 24.2, "ret_share": 6.2, "summer": [{"h": 0, "pv": 0.0, "res": 200.1, "off": 9.9, "ret": 2.5, "dem": 212.6}, {"h": 1, "pv": 0.0, "res": 171.5, "off": 9.9, "ret": 2.5, "dem": 184.0}, {"h": 2, "pv": 0.0, "res": 160.1, "off": 9.9, "ret": 2.5, "dem": 172.6}, {"h": 3, "pv": 0.0, "res": 154.4, "off": 9.9, "ret": 2.5, "dem": 166.8}, {"h": 4, "pv": 0.0, "res": 160.1, "off": 9.9, "ret": 2.5, "dem": 172.6}, {"h": 5, "pv": 0.0, "res": 182.9, "off": 19.9, "ret": 5.1, "dem": 207.9}, {"h": 6, "pv": 14.9, "res": 240.1, "off": 29.8, "ret": 7.6, "dem": 277.6}, {"h": 7, "pv": 59.5, "res": 314.4, "off": 49.7, "ret": 12.7, "dem": 376.8}, {"h": 8, "pv": 148.8, "res": 274.4, "off": 129.2, "ret": 30.5, "dem": 434.1}, {"h": 9, "pv": 297.6, "res": 228.7, "off": 149.1, "ret": 35.6, "dem": 413.4}, {"h": 10, "pv": 446.4, "res": 217.2, "off": 159.1, "ret": 38.1, "dem": 414.4}, {"h": 11, "pv": 580.3, "res": 217.2, "off": 163.0, "ret": 39.6, "dem": 419.9}, {"h": 12, "pv": 654.7, "res": 228.7, "off": 139.2, "ret": 33.0, "dem": 400.9}, {"h": 13, "pv": 684.5, "res": 217.2, "off": 149.1, "ret": 34.6, "dem": 400.9}, {"h": 14, "pv": 654.7, "res": 211.5, "off": 159.1, "ret": 35.6, "dem": 406.2}, {"h": 15, "pv": 580.3, "res": 217.2, "off": 163.0, "ret": 36.6, "dem": 416.9}, {"h": 16, "pv": 431.5, "res": 240.1, "off": 149.1, "ret": 35.6, "dem": 424.8}, {"h": 17, "pv": 260.4, "res": 297.3, "off": 119.3, "ret": 33.0, "dem": 449.6}, {"h": 18, "pv": 111.6, "res": 343.0, "off": 69.6, "ret": 28.0, "dem": 440.6}, {"h": 19, "pv": 29.8, "res": 354.5, "off": 39.8, "ret": 22.9, "dem": 417.1}, {"h": 20, "pv": 0.0, "res": 331.6, "off": 29.8, "ret": 17.8, "dem": 379.2}, {"h": 21, "pv": 0.0, "res": 297.3, "off": 19.9, "ret": 10.2, "dem": 327.3}, {"h": 22, "pv": 0.0, "res": 257.3, "off": 15.9, "ret": 6.1, "dem": 279.3}, {"h": 23, "pv": 0.0, "res": 228.7, "off": 9.9, "ret": 4.1, "dem": 242.7}], "winter": [{"h": 0, "pv": 0.0, "res": 200.1, "off": 9.9, "ret": 2.5, "dem": 212.6}, {"h": 1, "pv": 0.0, "res": 171.5, "off": 9.9, "ret": 2.5, "dem": 184.0}, {"h": 2, "pv": 0.0, "res": 160.1, "off": 9.9, "ret": 2.5, "dem": 172.6}, {"h": 3, "pv": 0.0, "res": 154.4, "off": 9.9, "ret": 2.5, "dem": 166.8}, {"h": 4, "pv": 0.0, "res": 160.1, "off": 9.9, "ret": 2.5, "dem": 172.6}, {"h": 5, "pv": 0.0, "res": 182.9, "off": 19.9, "ret": 5.1, "dem": 207.9}, {"h": 6, "pv": 7.4, "res": 240.1, "off": 29.8, "ret": 7.6, "dem": 277.6}, {"h": 7, "pv": 29.8, "res": 314.4, "off": 49.7, "ret": 12.7, "dem": 376.8}, {"h": 8, "pv": 74.4, "res": 274.4, "off": 129.2, "ret": 30.5, "dem": 434.1}, {"h": 9, "pv": 148.8, "res": 228.7, "off": 149.1, "ret": 35.6, "dem": 413.4}, {"h": 10, "pv": 223.2, "res": 217.2, "off": 159.1, "ret": 38.1, "dem": 414.4}, {"h": 11, "pv": 290.2, "res": 217.2, "off": 163.0, "ret": 39.6, "dem": 419.9}, {"h": 12, "pv": 327.4, "res": 228.7, "off": 139.2, "ret": 33.0, "dem": 400.9}, {"h": 13, "pv": 342.3, "res": 217.2, "off": 149.1, "ret": 34.6, "dem": 400.9}, {"h": 14, "pv": 327.4, "res": 211.5, "off": 159.1, "ret": 35.6, "dem": 406.2}, {"h": 15, "pv": 290.2, "res": 217.2, "off": 163.0, "ret": 36.6, "dem": 416.9}, {"h": 16, "pv": 215.8, "res": 240.1, "off": 149.1, "ret": 35.6, "dem": 424.8}, {"h": 17, "pv": 130.2, "res": 297.3, "off": 119.3, "ret": 33.0, "dem": 449.6}, {"h": 18, "pv": 55.8, "res": 343.0, "off": 69.6, "ret": 28.0, "dem": 440.6}, {"h": 19, "pv": 14.9, "res": 354.5, "off": 39.8, "ret": 22.9, "dem": 417.1}, {"h": 20, "pv": 0.0, "res": 331.6, "off": 29.8, "ret": 17.8, "dem": 379.2}, {"h": 21, "pv": 0.0, "res": 297.3, "off": 19.9, "ret": 10.2, "dem": 327.3}, {"h": 22, "pv": 0.0, "res": 257.3, "off": 15.9, "ret": 6.1, "dem": 279.3}, {"h": 23, "pv": 0.0, "res": 228.7, "off": 9.9, "ret": 4.1, "dem": 242.7}]}, {"block": 3, "residents": 468, "kwp": 294.4, "annual_pv": 447087, "annual_dem": 3624747, "self_suff": 12.3, "res_share": 49.4, "off_share": 42.9, "ret_share": 7.8, "summer": [{"h": 0, "pv": 0.0, "res": 171.5, "off": 21.3, "ret": 3.9, "dem": 196.7}, {"h": 1, "pv": 0.0, "res": 147.0, "off": 21.3, "ret": 3.9, "dem": 172.2}, {"h": 2, "pv": 0.0, "res": 137.2, "off": 21.3, "ret": 3.9, "dem": 162.4}, {"h": 3, "pv": 0.0, "res": 132.3, "off": 21.3, "ret": 3.9, "dem": 157.5}, {"h": 4, "pv": 0.0, "res": 137.2, "off": 21.3, "ret": 3.9, "dem": 162.4}, {"h": 5, "pv": 0.0, "res": 156.8, "off": 42.6, "ret": 7.7, "dem": 207.1}, {"h": 6, "pv": 33.8, "res": 205.9, "off": 63.8, "ret": 11.6, "dem": 281.3}, {"h": 7, "pv": 135.0, "res": 269.6, "off": 106.4, "ret": 19.3, "dem": 395.3}, {"h": 8, "pv": 337.6, "res": 235.3, "off": 276.7, "ret": 46.4, "dem": 558.3}, {"h": 9, "pv": 675.2, "res": 196.0, "off": 319.2, "ret": 54.1, "dem": 569.4}, {"h": 10, "pv": 1012.7, "res": 186.2, "off": 340.5, "ret": 58.0, "dem": 584.7}, {"h": 11, "pv": 1316.6, "res": 186.2, "off": 349.0, "ret": 60.3, "dem": 595.6}, {"h": 12, "pv": 1485.3, "res": 196.0, "off": 297.9, "ret": 50.3, "dem": 544.3}, {"h": 13, "pv": 1552.9, "res": 186.2, "off": 319.2, "ret": 52.6, "dem": 558.1}, {"h": 14, "pv": 1485.3, "res": 181.3, "off": 340.5, "ret": 54.1, "dem": 576.0}, {"h": 15, "pv": 1316.6, "res": 186.2, "off": 349.0, "ret": 55.7, "dem": 590.9}, {"h": 16, "pv": 979.0, "res": 205.9, "off": 319.2, "ret": 54.1, "dem": 579.2}, {"h": 17, "pv": 590.8, "res": 254.9, "off": 255.4, "ret": 50.3, "dem": 560.5}, {"h": 18, "pv": 253.2, "res": 294.1, "off": 149.0, "ret": 42.5, "dem": 485.6}, {"h": 19, "pv": 67.5, "res": 303.9, "off": 85.1, "ret": 34.8, "dem": 423.8}, {"h": 20, "pv": 0.0, "res": 284.3, "off": 63.8, "ret": 27.1, "dem": 375.2}, {"h": 21, "pv": 0.0, "res": 254.9, "off": 42.6, "ret": 15.5, "dem": 312.9}, {"h": 22, "pv": 0.0, "res": 220.6, "off": 34.1, "ret": 9.3, "dem": 263.9}, {"h": 23, "pv": 0.0, "res": 196.0, "off": 21.3, "ret": 6.2, "dem": 223.5}], "winter": [{"h": 0, "pv": 0.0, "res": 171.5, "off": 21.3, "ret": 3.9, "dem": 196.7}, {"h": 1, "pv": 0.0, "res": 147.0, "off": 21.3, "ret": 3.9, "dem": 172.2}, {"h": 2, "pv": 0.0, "res": 137.2, "off": 21.3, "ret": 3.9, "dem": 162.4}, {"h": 3, "pv": 0.0, "res": 132.3, "off": 21.3, "ret": 3.9, "dem": 157.5}, {"h": 4, "pv": 0.0, "res": 137.2, "off": 21.3, "ret": 3.9, "dem": 162.4}, {"h": 5, "pv": 0.0, "res": 156.8, "off": 42.6, "ret": 7.7, "dem": 207.1}, {"h": 6, "pv": 16.9, "res": 205.9, "off": 63.8, "ret": 11.6, "dem": 281.3}, {"h": 7, "pv": 67.5, "res": 269.6, "off": 106.4, "ret": 19.3, "dem": 395.3}, {"h": 8, "pv": 168.8, "res": 235.3, "off": 276.7, "ret": 46.4, "dem": 558.3}, {"h": 9, "pv": 337.6, "res": 196.0, "off": 319.2, "ret": 54.1, "dem": 569.4}, {"h": 10, "pv": 506.4, "res": 186.2, "off": 340.5, "ret": 58.0, "dem": 584.7}, {"h": 11, "pv": 658.3, "res": 186.2, "off": 349.0, "ret": 60.3, "dem": 595.6}, {"h": 12, "pv": 742.7, "res": 196.0, "off": 297.9, "ret": 50.3, "dem": 544.3}, {"h": 13, "pv": 776.4, "res": 186.2, "off": 319.2, "ret": 52.6, "dem": 558.1}, {"h": 14, "pv": 742.7, "res": 181.3, "off": 340.5, "ret": 54.1, "dem": 576.0}, {"h": 15, "pv": 658.3, "res": 186.2, "off": 349.0, "ret": 55.7, "dem": 590.9}, {"h": 16, "pv": 489.5, "res": 205.9, "off": 319.2, "ret": 54.1, "dem": 579.2}, {"h": 17, "pv": 295.4, "res": 254.9, "off": 255.4, "ret": 50.3, "dem": 560.5}, {"h": 18, "pv": 126.6, "res": 294.1, "off": 149.0, "ret": 42.5, "dem": 485.6}, {"h": 19, "pv": 33.8, "res": 303.9, "off": 85.1, "ret": 34.8, "dem": 423.8}, {"h": 20, "pv": 0.0, "res": 284.3, "off": 63.8, "ret": 27.1, "dem": 375.2}, {"h": 21, "pv": 0.0, "res": 254.9, "off": 42.6, "ret": 15.5, "dem": 312.9}, {"h": 22, "pv": 0.0, "res": 220.6, "off": 34.1, "ret": 9.3, "dem": 263.9}, {"h": 23, "pv": 0.0, "res": 196.0, "off": 21.3, "ret": 6.2, "dem": 223.5}]}, {"block": 4, "residents": 940, "kwp": 198.8, "annual_pv": 301872, "annual_dem": 4178651, "self_suff": 7.2, "res_share": 86.0, "off_share": 10.9, "ret_share": 3.1, "summer": [{"h": 0, "pv": 0.0, "res": 344.5, "off": 6.2, "ret": 1.8, "dem": 352.6}, {"h": 1, "pv": 0.0, "res": 295.3, "off": 6.2, "ret": 1.8, "dem": 303.3}, {"h": 2, "pv": 0.0, "res": 275.6, "off": 6.2, "ret": 1.8, "dem": 283.6}, {"h": 3, "pv": 0.0, "res": 265.8, "off": 6.2, "ret": 1.8, "dem": 273.8}, {"h": 4, "pv": 0.0, "res": 275.6, "off": 6.2, "ret": 1.8, "dem": 283.6}, {"h": 5, "pv": 0.0, "res": 315.0, "off": 12.5, "ret": 3.6, "dem": 331.0}, {"h": 6, "pv": 22.8, "res": 413.4, "off": 18.7, "ret": 5.4, "dem": 437.5}, {"h": 7, "pv": 91.2, "res": 541.4, "off": 31.1, "ret": 9.0, "dem": 581.5}, {"h": 8, "pv": 227.9, "res": 472.5, "off": 80.9, "ret": 21.6, "dem": 575.0}, {"h": 9, "pv": 455.9, "res": 393.7, "off": 93.4, "ret": 25.2, "dem": 512.3}, {"h": 10, "pv": 683.8, "res": 374.1, "off": 99.6, "ret": 27.0, "dem": 500.6}, {"h": 11, "pv": 888.9, "res": 374.1, "off": 102.1, "ret": 28.1, "dem": 504.2}, {"h": 12, "pv": 1002.9, "res": 393.7, "off": 87.2, "ret": 23.4, "dem": 504.3}, {"h": 13, "pv": 1048.5, "res": 374.1, "off": 93.4, "ret": 24.5, "dem": 491.9}, {"h": 14, "pv": 1002.9, "res": 364.2, "off": 99.6, "ret": 25.2, "dem": 489.0}, {"h": 15, "pv": 888.9, "res": 374.1, "off": 102.1, "ret": 25.9, "dem": 502.0}, {"h": 16, "pv": 661.0, "res": 413.4, "off": 93.4, "ret": 25.2, "dem": 532.0}, {"h": 17, "pv": 398.9, "res": 511.9, "off": 74.7, "ret": 23.4, "dem": 610.0}, {"h": 18, "pv": 170.9, "res": 590.6, "off": 43.6, "ret": 19.8, "dem": 654.0}, {"h": 19, "pv": 45.6, "res": 610.3, "off": 24.9, "ret": 16.2, "dem": 651.4}, {"h": 20, "pv": 0.0, "res": 570.9, "off": 18.7, "ret": 12.6, "dem": 602.2}, {"h": 21, "pv": 0.0, "res": 511.9, "off": 12.5, "ret": 7.2, "dem": 531.5}, {"h": 22, "pv": 0.0, "res": 443.0, "off": 10.0, "ret": 4.3, "dem": 457.2}, {"h": 23, "pv": 0.0, "res": 393.7, "off": 6.2, "ret": 2.9, "dem": 402.8}], "winter": [{"h": 0, "pv": 0.0, "res": 344.5, "off": 6.2, "ret": 1.8, "dem": 352.6}, {"h": 1, "pv": 0.0, "res": 295.3, "off": 6.2, "ret": 1.8, "dem": 303.3}, {"h": 2, "pv": 0.0, "res": 275.6, "off": 6.2, "ret": 1.8, "dem": 283.6}, {"h": 3, "pv": 0.0, "res": 265.8, "off": 6.2, "ret": 1.8, "dem": 273.8}, {"h": 4, "pv": 0.0, "res": 275.6, "off": 6.2, "ret": 1.8, "dem": 283.6}, {"h": 5, "pv": 0.0, "res": 315.0, "off": 12.5, "ret": 3.6, "dem": 331.0}, {"h": 6, "pv": 11.4, "res": 413.4, "off": 18.7, "ret": 5.4, "dem": 437.5}, {"h": 7, "pv": 45.6, "res": 541.4, "off": 31.1, "ret": 9.0, "dem": 581.5}, {"h": 8, "pv": 114.0, "res": 472.5, "off": 80.9, "ret": 21.6, "dem": 575.0}, {"h": 9, "pv": 227.9, "res": 393.7, "off": 93.4, "ret": 25.2, "dem": 512.3}, {"h": 10, "pv": 341.9, "res": 374.1, "off": 99.6, "ret": 27.0, "dem": 500.6}, {"h": 11, "pv": 444.5, "res": 374.1, "off": 102.1, "ret": 28.1, "dem": 504.2}, {"h": 12, "pv": 501.5, "res": 393.7, "off": 87.2, "ret": 23.4, "dem": 504.3}, {"h": 13, "pv": 524.2, "res": 374.1, "off": 93.4, "ret": 24.5, "dem": 491.9}, {"h": 14, "pv": 501.5, "res": 364.2, "off": 99.6, "ret": 25.2, "dem": 489.0}, {"h": 15, "pv": 444.5, "res": 374.1, "off": 102.1, "ret": 25.9, "dem": 502.0}, {"h": 16, "pv": 330.5, "res": 413.4, "off": 93.4, "ret": 25.2, "dem": 532.0}, {"h": 17, "pv": 199.4, "res": 511.9, "off": 74.7, "ret": 23.4, "dem": 610.0}, {"h": 18, "pv": 85.5, "res": 590.6, "off": 43.6, "ret": 19.8, "dem": 654.0}, {"h": 19, "pv": 22.8, "res": 610.3, "off": 24.9, "ret": 16.2, "dem": 651.4}, {"h": 20, "pv": 0.0, "res": 570.9, "off": 18.7, "ret": 12.6, "dem": 602.2}, {"h": 21, "pv": 0.0, "res": 511.9, "off": 12.5, "ret": 7.2, "dem": 531.5}, {"h": 22, "pv": 0.0, "res": 443.0, "off": 10.0, "ret": 4.3, "dem": 457.2}, {"h": 23, "pv": 0.0, "res": 393.7, "off": 6.2, "ret": 2.9, "dem": 402.8}]}, {"block": 5, "residents": 351, "kwp": 164.9, "annual_pv": 250454, "annual_dem": 1847038, "self_suff": 13.6, "res_share": 72.6, "off_share": 19.0, "ret_share": 8.4, "summer": [{"h": 0, "pv": 0.0, "res": 128.6, "off": 4.8, "ret": 2.1, "dem": 135.6}, {"h": 1, "pv": 0.0, "res": 110.3, "off": 4.8, "ret": 2.1, "dem": 117.2}, {"h": 2, "pv": 0.0, "res": 102.9, "off": 4.8, "ret": 2.1, "dem": 109.8}, {"h": 3, "pv": 0.0, "res": 99.2, "off": 4.8, "ret": 2.1, "dem": 106.2}, {"h": 4, "pv": 0.0, "res": 102.9, "off": 4.8, "ret": 2.1, "dem": 109.8}, {"h": 5, "pv": 0.0, "res": 117.6, "off": 9.6, "ret": 4.2, "dem": 131.5}, {"h": 6, "pv": 18.9, "res": 154.4, "off": 14.4, "ret": 6.3, "dem": 175.1}, {"h": 7, "pv": 75.6, "res": 202.1, "off": 24.1, "ret": 10.6, "dem": 236.8}, {"h": 8, "pv": 189.1, "res": 176.4, "off": 62.6, "ret": 25.4, "dem": 264.3}, {"h": 9, "pv": 378.2, "res": 147.0, "off": 72.2, "ret": 29.6, "dem": 248.8}, {"h": 10, "pv": 567.3, "res": 139.7, "off": 77.0, "ret": 31.7, "dem": 248.4}, {"h": 11, "pv": 737.5, "res": 139.7, "off": 78.9, "ret": 33.0, "dem": 251.6}, {"h": 12, "pv": 832.1, "res": 147.0, "off": 67.4, "ret": 27.5, "dem": 241.9}, {"h": 13, "pv": 869.9, "res": 139.7, "off": 72.2, "ret": 28.8, "dem": 240.6}, {"h": 14, "pv": 832.1, "res": 136.0, "off": 77.0, "ret": 29.6, "dem": 242.6}, {"h": 15, "pv": 737.5, "res": 139.7, "off": 78.9, "ret": 30.4, "dem": 249.0}, {"h": 16, "pv": 548.4, "res": 154.4, "off": 72.2, "ret": 29.6, "dem": 256.1}, {"h": 17, "pv": 330.9, "res": 191.1, "off": 57.7, "ret": 27.5, "dem": 276.3}, {"h": 18, "pv": 141.8, "res": 220.5, "off": 33.7, "ret": 23.3, "dem": 277.4}, {"h": 19, "pv": 37.8, "res": 227.9, "off": 19.2, "ret": 19.0, "dem": 266.1}, {"h": 20, "pv": 0.0, "res": 213.2, "off": 14.4, "ret": 14.8, "dem": 242.4}, {"h": 21, "pv": 0.0, "res": 191.1, "off": 9.6, "ret": 8.5, "dem": 209.2}, {"h": 22, "pv": 0.0, "res": 165.4, "off": 7.7, "ret": 5.1, "dem": 178.2}, {"h": 23, "pv": 0.0, "res": 147.0, "off": 4.8, "ret": 3.4, "dem": 155.2}], "winter": [{"h": 0, "pv": 0.0, "res": 128.6, "off": 4.8, "ret": 2.1, "dem": 135.6}, {"h": 1, "pv": 0.0, "res": 110.3, "off": 4.8, "ret": 2.1, "dem": 117.2}, {"h": 2, "pv": 0.0, "res": 102.9, "off": 4.8, "ret": 2.1, "dem": 109.8}, {"h": 3, "pv": 0.0, "res": 99.2, "off": 4.8, "ret": 2.1, "dem": 106.2}, {"h": 4, "pv": 0.0, "res": 102.9, "off": 4.8, "ret": 2.1, "dem": 109.8}, {"h": 5, "pv": 0.0, "res": 117.6, "off": 9.6, "ret": 4.2, "dem": 131.5}, {"h": 6, "pv": 9.5, "res": 154.4, "off": 14.4, "ret": 6.3, "dem": 175.1}, {"h": 7, "pv": 37.8, "res": 202.1, "off": 24.1, "ret": 10.6, "dem": 236.8}, {"h": 8, "pv": 94.6, "res": 176.4, "off": 62.6, "ret": 25.4, "dem": 264.3}, {"h": 9, "pv": 189.1, "res": 147.0, "off": 72.2, "ret": 29.6, "dem": 248.8}, {"h": 10, "pv": 283.7, "res": 139.7, "off": 77.0, "ret": 31.7, "dem": 248.4}, {"h": 11, "pv": 368.8, "res": 139.7, "off": 78.9, "ret": 33.0, "dem": 251.6}, {"h": 12, "pv": 416.0, "res": 147.0, "off": 67.4, "ret": 27.5, "dem": 241.9}, {"h": 13, "pv": 434.9, "res": 139.7, "off": 72.2, "ret": 28.8, "dem": 240.6}, {"h": 14, "pv": 416.0, "res": 136.0, "off": 77.0, "ret": 29.6, "dem": 242.6}, {"h": 15, "pv": 368.8, "res": 139.7, "off": 78.9, "ret": 30.4, "dem": 249.0}, {"h": 16, "pv": 274.2, "res": 154.4, "off": 72.2, "ret": 29.6, "dem": 256.1}, {"h": 17, "pv": 165.5, "res": 191.1, "off": 57.7, "ret": 27.5, "dem": 276.3}, {"h": 18, "pv": 70.9, "res": 220.5, "off": 33.7, "ret": 23.3, "dem": 277.4}, {"h": 19, "pv": 18.9, "res": 227.9, "off": 19.2, "ret": 19.0, "dem": 266.1}, {"h": 20, "pv": 0.0, "res": 213.2, "off": 14.4, "ret": 14.8, "dem": 242.4}, {"h": 21, "pv": 0.0, "res": 191.1, "off": 9.6, "ret": 8.5, "dem": 209.2}, {"h": 22, "pv": 0.0, "res": 165.4, "off": 7.7, "ret": 5.1, "dem": 178.2}, {"h": 23, "pv": 0.0, "res": 147.0, "off": 4.8, "ret": 3.4, "dem": 155.2}]}, {"block": 6, "residents": 752, "kwp": 300.5, "annual_pv": 456356, "annual_dem": 3619307, "self_suff": 12.6, "res_share": 79.4, "off_share": 10.6, "ret_share": 10.0, "summer": [{"h": 0, "pv": 0.0, "res": 275.7, "off": 5.2, "ret": 5.0, "dem": 285.9}, {"h": 1, "pv": 0.0, "res": 236.3, "off": 5.2, "ret": 5.0, "dem": 246.5}, {"h": 2, "pv": 0.0, "res": 220.5, "off": 5.2, "ret": 5.0, "dem": 230.7}, {"h": 3, "pv": 0.0, "res": 212.6, "off": 5.2, "ret": 5.0, "dem": 222.8}, {"h": 4, "pv": 0.0, "res": 220.5, "off": 5.2, "ret": 5.0, "dem": 230.7}, {"h": 5, "pv": 0.0, "res": 252.0, "off": 10.5, "ret": 9.9, "dem": 272.4}, {"h": 6, "pv": 34.5, "res": 330.8, "off": 15.7, "ret": 14.9, "dem": 361.4}, {"h": 7, "pv": 137.8, "res": 433.2, "off": 26.2, "ret": 24.8, "dem": 484.2}, {"h": 8, "pv": 344.6, "res": 378.0, "off": 68.1, "ret": 59.5, "dem": 505.7}, {"h": 9, "pv": 689.2, "res": 315.0, "off": 78.6, "ret": 69.4, "dem": 463.1}, {"h": 10, "pv": 1033.7, "res": 299.3, "off": 83.8, "ret": 74.4, "dem": 457.5}, {"h": 11, "pv": 1343.8, "res": 299.3, "off": 85.9, "ret": 77.4, "dem": 462.6}, {"h": 12, "pv": 1516.1, "res": 315.0, "off": 73.4, "ret": 64.5, "dem": 452.9}, {"h": 13, "pv": 1585.1, "res": 299.3, "off": 78.6, "ret": 67.5, "dem": 445.3}, {"h": 14, "pv": 1516.1, "res": 291.4, "off": 83.8, "ret": 69.4, "dem": 444.7}, {"h": 15, "pv": 1343.8, "res": 299.3, "off": 85.9, "ret": 71.4, "dem": 456.7}, {"h": 16, "pv": 999.3, "res": 330.8, "off": 78.6, "ret": 69.4, "dem": 478.8}, {"h": 17, "pv": 603.0, "res": 409.5, "off": 62.9, "ret": 64.5, "dem": 536.9}, {"h": 18, "pv": 258.4, "res": 472.5, "off": 36.7, "ret": 54.6, "dem": 563.8}, {"h": 19, "pv": 68.9, "res": 488.3, "off": 21.0, "ret": 44.6, "dem": 553.9}, {"h": 20, "pv": 0.0, "res": 456.8, "off": 15.7, "ret": 34.7, "dem": 507.2}, {"h": 21, "pv": 0.0, "res": 409.5, "off": 10.5, "ret": 19.8, "dem": 439.9}, {"h": 22, "pv": 0.0, "res": 354.4, "off": 8.4, "ret": 11.9, "dem": 374.7}, {"h": 23, "pv": 0.0, "res": 315.0, "off": 5.2, "ret": 7.9, "dem": 328.2}], "winter": [{"h": 0, "pv": 0.0, "res": 275.7, "off": 5.2, "ret": 5.0, "dem": 285.9}, {"h": 1, "pv": 0.0, "res": 236.3, "off": 5.2, "ret": 5.0, "dem": 246.5}, {"h": 2, "pv": 0.0, "res": 220.5, "off": 5.2, "ret": 5.0, "dem": 230.7}, {"h": 3, "pv": 0.0, "res": 212.6, "off": 5.2, "ret": 5.0, "dem": 222.8}, {"h": 4, "pv": 0.0, "res": 220.5, "off": 5.2, "ret": 5.0, "dem": 230.7}, {"h": 5, "pv": 0.0, "res": 252.0, "off": 10.5, "ret": 9.9, "dem": 272.4}, {"h": 6, "pv": 17.2, "res": 330.8, "off": 15.7, "ret": 14.9, "dem": 361.4}, {"h": 7, "pv": 68.9, "res": 433.2, "off": 26.2, "ret": 24.8, "dem": 484.2}, {"h": 8, "pv": 172.3, "res": 378.0, "off": 68.1, "ret": 59.5, "dem": 505.7}, {"h": 9, "pv": 344.6, "res": 315.0, "off": 78.6, "ret": 69.4, "dem": 463.1}, {"h": 10, "pv": 516.9, "res": 299.3, "off": 83.8, "ret": 74.4, "dem": 457.5}, {"h": 11, "pv": 671.9, "res": 299.3, "off": 85.9, "ret": 77.4, "dem": 462.6}, {"h": 12, "pv": 758.1, "res": 315.0, "off": 73.4, "ret": 64.5, "dem": 452.9}, {"h": 13, "pv": 792.5, "res": 299.3, "off": 78.6, "ret": 67.5, "dem": 445.3}, {"h": 14, "pv": 758.1, "res": 291.4, "off": 83.8, "ret": 69.4, "dem": 444.7}, {"h": 15, "pv": 671.9, "res": 299.3, "off": 85.9, "ret": 71.4, "dem": 456.7}, {"h": 16, "pv": 499.6, "res": 330.8, "off": 78.6, "ret": 69.4, "dem": 478.8}, {"h": 17, "pv": 301.5, "res": 409.5, "off": 62.9, "ret": 64.5, "dem": 536.9}, {"h": 18, "pv": 129.2, "res": 472.5, "off": 36.7, "ret": 54.6, "dem": 563.8}, {"h": 19, "pv": 34.5, "res": 488.3, "off": 21.0, "ret": 44.6, "dem": 553.9}, {"h": 20, "pv": 0.0, "res": 456.8, "off": 15.7, "ret": 34.7, "dem": 507.2}, {"h": 21, "pv": 0.0, "res": 409.5, "off": 10.5, "ret": 19.8, "dem": 439.9}, {"h": 22, "pv": 0.0, "res": 354.4, "off": 8.4, "ret": 11.9, "dem": 374.7}, {"h": 23, "pv": 0.0, "res": 315.0, "off": 5.2, "ret": 7.9, "dem": 328.2}]}, {"block": 7, "residents": 700, "kwp": 236.1, "annual_pv": 358604, "annual_dem": 4692694, "self_suff": 7.6, "res_share": 57.0, "off_share": 32.6, "ret_share": 10.5, "summer": [{"h": 0, "pv": 0.0, "res": 256.3, "off": 20.9, "ret": 6.7, "dem": 284.0}, {"h": 1, "pv": 0.0, "res": 219.7, "off": 20.9, "ret": 6.7, "dem": 247.4}, {"h": 2, "pv": 0.0, "res": 205.0, "off": 20.9, "ret": 6.7, "dem": 232.7}, {"h": 3, "pv": 0.0, "res": 197.7, "off": 20.9, "ret": 6.7, "dem": 225.4}, {"h": 4, "pv": 0.0, "res": 205.0, "off": 20.9, "ret": 6.7, "dem": 232.7}, {"h": 5, "pv": 0.0, "res": 234.3, "off": 41.9, "ret": 13.5, "dem": 289.7}, {"h": 6, "pv": 27.1, "res": 307.6, "off": 62.8, "ret": 20.2, "dem": 390.6}, {"h": 7, "pv": 108.3, "res": 402.8, "off": 104.7, "ret": 33.7, "dem": 541.1}, {"h": 8, "pv": 270.8, "res": 351.5, "off": 272.1, "ret": 80.8, "dem": 704.5}, {"h": 9, "pv": 541.5, "res": 292.9, "off": 314.0, "ret": 94.3, "dem": 701.2}, {"h": 10, "pv": 812.3, "res": 278.3, "off": 334.9, "ret": 101.0, "dem": 714.2}, {"h": 11, "pv": 1056.0, "res": 278.3, "off": 343.3, "ret": 105.1, "dem": 726.7}, {"h": 12, "pv": 1191.4, "res": 292.9, "off": 293.1, "ret": 87.6, "dem": 673.5}, {"h": 13, "pv": 1245.5, "res": 278.3, "off": 314.0, "ret": 91.6, "dem": 683.9}, {"h": 14, "pv": 1191.4, "res": 270.9, "off": 334.9, "ret": 94.3, "dem": 700.2}, {"h": 15, "pv": 1056.0, "res": 278.3, "off": 343.3, "ret": 97.0, "dem": 718.6}, {"h": 16, "pv": 785.2, "res": 307.6, "off": 314.0, "ret": 94.3, "dem": 715.9}, {"h": 17, "pv": 473.8, "res": 380.8, "off": 251.2, "ret": 87.6, "dem": 719.6}, {"h": 18, "pv": 203.1, "res": 439.4, "off": 146.5, "ret": 74.1, "dem": 660.0}, {"h": 19, "pv": 54.2, "res": 454.0, "off": 83.7, "ret": 60.6, "dem": 598.4}, {"h": 20, "pv": 0.0, "res": 424.7, "off": 62.8, "ret": 47.1, "dem": 534.7}, {"h": 21, "pv": 0.0, "res": 380.8, "off": 41.9, "ret": 26.9, "dem": 449.6}, {"h": 22, "pv": 0.0, "res": 329.5, "off": 33.5, "ret": 16.2, "dem": 379.2}, {"h": 23, "pv": 0.0, "res": 292.9, "off": 20.9, "ret": 10.8, "dem": 324.6}], "winter": [{"h": 0, "pv": 0.0, "res": 256.3, "off": 20.9, "ret": 6.7, "dem": 284.0}, {"h": 1, "pv": 0.0, "res": 219.7, "off": 20.9, "ret": 6.7, "dem": 247.4}, {"h": 2, "pv": 0.0, "res": 205.0, "off": 20.9, "ret": 6.7, "dem": 232.7}, {"h": 3, "pv": 0.0, "res": 197.7, "off": 20.9, "ret": 6.7, "dem": 225.4}, {"h": 4, "pv": 0.0, "res": 205.0, "off": 20.9, "ret": 6.7, "dem": 232.7}, {"h": 5, "pv": 0.0, "res": 234.3, "off": 41.9, "ret": 13.5, "dem": 289.7}, {"h": 6, "pv": 13.5, "res": 307.6, "off": 62.8, "ret": 20.2, "dem": 390.6}, {"h": 7, "pv": 54.2, "res": 402.8, "off": 104.7, "ret": 33.7, "dem": 541.1}, {"h": 8, "pv": 135.4, "res": 351.5, "off": 272.1, "ret": 80.8, "dem": 704.5}, {"h": 9, "pv": 270.8, "res": 292.9, "off": 314.0, "ret": 94.3, "dem": 701.2}, {"h": 10, "pv": 406.2, "res": 278.3, "off": 334.9, "ret": 101.0, "dem": 714.2}, {"h": 11, "pv": 528.0, "res": 278.3, "off": 343.3, "ret": 105.1, "dem": 726.7}, {"h": 12, "pv": 595.7, "res": 292.9, "off": 293.1, "ret": 87.6, "dem": 673.5}, {"h": 13, "pv": 622.8, "res": 278.3, "off": 314.0, "ret": 91.6, "dem": 683.9}, {"h": 14, "pv": 595.7, "res": 270.9, "off": 334.9, "ret": 94.3, "dem": 700.2}, {"h": 15, "pv": 528.0, "res": 278.3, "off": 343.3, "ret": 97.0, "dem": 718.6}, {"h": 16, "pv": 392.6, "res": 307.6, "off": 314.0, "ret": 94.3, "dem": 715.9}, {"h": 17, "pv": 236.9, "res": 380.8, "off": 251.2, "ret": 87.6, "dem": 719.6}, {"h": 18, "pv": 101.5, "res": 439.4, "off": 146.5, "ret": 74.1, "dem": 660.0}, {"h": 19, "pv": 27.1, "res": 454.0, "off": 83.7, "ret": 60.6, "dem": 598.4}, {"h": 20, "pv": 0.0, "res": 424.7, "off": 62.8, "ret": 47.1, "dem": 534.7}, {"h": 21, "pv": 0.0, "res": 380.8, "off": 41.9, "ret": 26.9, "dem": 449.6}, {"h": 22, "pv": 0.0, "res": 329.5, "off": 33.5, "ret": 16.2, "dem": 379.2}, {"h": 23, "pv": 0.0, "res": 292.9, "off": 20.9, "ret": 10.8, "dem": 324.6}]}, {"block": 8, "residents": 172, "kwp": 200.0, "annual_pv": 303795, "annual_dem": 3192737, "self_suff": 9.5, "res_share": 20.6, "off_share": 64.4, "ret_share": 15.0, "summer": [{"h": 0, "pv": 0.0, "res": 63.0, "off": 28.2, "ret": 6.6, "dem": 97.7}, {"h": 1, "pv": 0.0, "res": 54.0, "off": 28.2, "ret": 6.6, "dem": 88.7}, {"h": 2, "pv": 0.0, "res": 50.4, "off": 28.2, "ret": 6.6, "dem": 85.1}, {"h": 3, "pv": 0.0, "res": 48.6, "off": 28.2, "ret": 6.6, "dem": 83.3}, {"h": 4, "pv": 0.0, "res": 50.4, "off": 28.2, "ret": 6.6, "dem": 85.1}, {"h": 5, "pv": 0.0, "res": 57.6, "off": 56.4, "ret": 13.1, "dem": 127.1}, {"h": 6, "pv": 22.9, "res": 75.6, "off": 84.6, "ret": 19.7, "dem": 179.8}, {"h": 7, "pv": 91.8, "res": 99.0, "off": 140.9, "ret": 32.8, "dem": 272.7}, {"h": 8, "pv": 229.4, "res": 86.4, "off": 366.4, "ret": 78.6, "dem": 531.4}, {"h": 9, "pv": 458.8, "res": 72.0, "off": 422.8, "ret": 91.7, "dem": 586.5}, {"h": 10, "pv": 688.2, "res": 68.4, "off": 451.0, "ret": 98.3, "dem": 617.6}, {"h": 11, "pv": 894.6, "res": 68.4, "off": 462.2, "ret": 102.2, "dem": 632.8}, {"h": 12, "pv": 1009.3, "res": 72.0, "off": 394.6, "ret": 85.2, "dem": 551.8}, {"h": 13, "pv": 1055.2, "res": 68.4, "off": 422.8, "ret": 89.1, "dem": 580.3}, {"h": 14, "pv": 1009.3, "res": 66.6, "off": 451.0, "ret": 91.7, "dem": 609.3}, {"h": 15, "pv": 894.6, "res": 68.4, "off": 462.2, "ret": 94.4, "dem": 625.0}, {"h": 16, "pv": 665.2, "res": 75.6, "off": 422.8, "ret": 91.7, "dem": 590.1}, {"h": 17, "pv": 401.4, "res": 93.6, "off": 338.2, "ret": 85.2, "dem": 517.0}, {"h": 18, "pv": 172.0, "res": 108.0, "off": 197.3, "ret": 72.1, "dem": 377.4}, {"h": 19, "pv": 45.9, "res": 111.6, "off": 112.7, "ret": 59.0, "dem": 283.3}, {"h": 20, "pv": 0.0, "res": 104.4, "off": 84.6, "ret": 45.9, "dem": 234.8}, {"h": 21, "pv": 0.0, "res": 93.6, "off": 56.4, "ret": 26.2, "dem": 176.2}, {"h": 22, "pv": 0.0, "res": 81.0, "off": 45.1, "ret": 15.7, "dem": 141.8}, {"h": 23, "pv": 0.0, "res": 72.0, "off": 28.2, "ret": 10.5, "dem": 110.7}], "winter": [{"h": 0, "pv": 0.0, "res": 63.0, "off": 28.2, "ret": 6.6, "dem": 97.7}, {"h": 1, "pv": 0.0, "res": 54.0, "off": 28.2, "ret": 6.6, "dem": 88.7}, {"h": 2, "pv": 0.0, "res": 50.4, "off": 28.2, "ret": 6.6, "dem": 85.1}, {"h": 3, "pv": 0.0, "res": 48.6, "off": 28.2, "ret": 6.6, "dem": 83.3}, {"h": 4, "pv": 0.0, "res": 50.4, "off": 28.2, "ret": 6.6, "dem": 85.1}, {"h": 5, "pv": 0.0, "res": 57.6, "off": 56.4, "ret": 13.1, "dem": 127.1}, {"h": 6, "pv": 11.5, "res": 75.6, "off": 84.6, "ret": 19.7, "dem": 179.8}, {"h": 7, "pv": 45.9, "res": 99.0, "off": 140.9, "ret": 32.8, "dem": 272.7}, {"h": 8, "pv": 114.7, "res": 86.4, "off": 366.4, "ret": 78.6, "dem": 531.4}, {"h": 9, "pv": 229.4, "res": 72.0, "off": 422.8, "ret": 91.7, "dem": 586.5}, {"h": 10, "pv": 344.1, "res": 68.4, "off": 451.0, "ret": 98.3, "dem": 617.6}, {"h": 11, "pv": 447.3, "res": 68.4, "off": 462.2, "ret": 102.2, "dem": 632.8}, {"h": 12, "pv": 504.6, "res": 72.0, "off": 394.6, "ret": 85.2, "dem": 551.8}, {"h": 13, "pv": 527.6, "res": 68.4, "off": 422.8, "ret": 89.1, "dem": 580.3}, {"h": 14, "pv": 504.6, "res": 66.6, "off": 451.0, "ret": 91.7, "dem": 609.3}, {"h": 15, "pv": 447.3, "res": 68.4, "off": 462.2, "ret": 94.4, "dem": 625.0}, {"h": 16, "pv": 332.6, "res": 75.6, "off": 422.8, "ret": 91.7, "dem": 590.1}, {"h": 17, "pv": 200.7, "res": 93.6, "off": 338.2, "ret": 85.2, "dem": 517.0}, {"h": 18, "pv": 86.0, "res": 108.0, "off": 197.3, "ret": 72.1, "dem": 377.4}, {"h": 19, "pv": 22.9, "res": 111.6, "off": 112.7, "ret": 59.0, "dem": 283.3}, {"h": 20, "pv": 0.0, "res": 104.4, "off": 84.6, "ret": 45.9, "dem": 234.8}, {"h": 21, "pv": 0.0, "res": 93.6, "off": 56.4, "ret": 26.2, "dem": 176.2}, {"h": 22, "pv": 0.0, "res": 81.0, "off": 45.1, "ret": 15.7, "dem": 141.8}, {"h": 23, "pv": 0.0, "res": 72.0, "off": 28.2, "ret": 10.5, "dem": 110.7}]}, {"block": 9, "residents": 526, "kwp": 263.4, "annual_pv": 399940, "annual_dem": 3964792, "self_suff": 10.1, "res_share": 50.7, "off_share": 31.3, "ret_share": 18.0, "summer": [{"h": 0, "pv": 0.0, "res": 192.8, "off": 17.0, "ret": 9.8, "dem": 219.6}, {"h": 1, "pv": 0.0, "res": 165.3, "off": 17.0, "ret": 9.8, "dem": 192.0}, {"h": 2, "pv": 0.0, "res": 154.3, "off": 17.0, "ret": 9.8, "dem": 181.0}, {"h": 3, "pv": 0.0, "res": 148.8, "off": 17.0, "ret": 9.8, "dem": 175.5}, {"h": 4, "pv": 0.0, "res": 154.3, "off": 17.0, "ret": 9.8, "dem": 181.0}, {"h": 5, "pv": 0.0, "res": 176.3, "off": 34.0, "ret": 19.6, "dem": 229.8}, {"h": 6, "pv": 30.2, "res": 231.4, "off": 50.9, "ret": 29.4, "dem": 311.7}, {"h": 7, "pv": 120.8, "res": 303.0, "off": 84.9, "ret": 48.9, "dem": 436.8}, {"h": 8, "pv": 302.0, "res": 264.5, "off": 220.8, "ret": 117.4, "dem": 602.6}, {"h": 9, "pv": 604.0, "res": 220.4, "off": 254.7, "ret": 137.0, "dem": 612.1}, {"h": 10, "pv": 905.9, "res": 209.4, "off": 271.7, "ret": 146.8, "dem": 627.8}, {"h": 11, "pv": 1177.7, "res": 209.4, "off": 278.5, "ret": 152.6, "dem": 640.5}, {"h": 12, "pv": 1328.7, "res": 220.4, "off": 237.7, "ret": 127.2, "dem": 585.3}, {"h": 13, "pv": 1389.1, "res": 209.4, "off": 254.7, "ret": 133.1, "dem": 597.1}, {"h": 14, "pv": 1328.7, "res": 203.8, "off": 271.7, "ret": 137.0, "dem": 612.5}, {"h": 15, "pv": 1177.7, "res": 209.4, "off": 278.5, "ret": 140.9, "dem": 628.7}, {"h": 16, "pv": 875.7, "res": 231.4, "off": 254.7, "ret": 137.0, "dem": 623.1}, {"h": 17, "pv": 528.5, "res": 286.5, "off": 203.8, "ret": 127.2, "dem": 617.5}, {"h": 18, "pv": 226.5, "res": 330.6, "off": 118.9, "ret": 107.6, "dem": 557.1}, {"h": 19, "pv": 60.4, "res": 341.6, "off": 67.9, "ret": 88.1, "dem": 497.6}, {"h": 20, "pv": 0.0, "res": 319.5, "off": 50.9, "ret": 68.5, "dem": 439.0}, {"h": 21, "pv": 0.0, "res": 286.5, "off": 34.0, "ret": 39.1, "dem": 359.6}, {"h": 22, "pv": 0.0, "res": 247.9, "off": 27.2, "ret": 23.5, "dem": 298.6}, {"h": 23, "pv": 0.0, "res": 220.4, "off": 17.0, "ret": 15.7, "dem": 253.0}], "winter": [{"h": 0, "pv": 0.0, "res": 192.8, "off": 17.0, "ret": 9.8, "dem": 219.6}, {"h": 1, "pv": 0.0, "res": 165.3, "off": 17.0, "ret": 9.8, "dem": 192.0}, {"h": 2, "pv": 0.0, "res": 154.3, "off": 17.0, "ret": 9.8, "dem": 181.0}, {"h": 3, "pv": 0.0, "res": 148.8, "off": 17.0, "ret": 9.8, "dem": 175.5}, {"h": 4, "pv": 0.0, "res": 154.3, "off": 17.0, "ret": 9.8, "dem": 181.0}, {"h": 5, "pv": 0.0, "res": 176.3, "off": 34.0, "ret": 19.6, "dem": 229.8}, {"h": 6, "pv": 15.1, "res": 231.4, "off": 50.9, "ret": 29.4, "dem": 311.7}, {"h": 7, "pv": 60.4, "res": 303.0, "off": 84.9, "ret": 48.9, "dem": 436.8}, {"h": 8, "pv": 151.0, "res": 264.5, "off": 220.8, "ret": 117.4, "dem": 602.6}, {"h": 9, "pv": 302.0, "res": 220.4, "off": 254.7, "ret": 137.0, "dem": 612.1}, {"h": 10, "pv": 453.0, "res": 209.4, "off": 271.7, "ret": 146.8, "dem": 627.8}, {"h": 11, "pv": 588.9, "res": 209.4, "off": 278.5, "ret": 152.6, "dem": 640.5}, {"h": 12, "pv": 664.4, "res": 220.4, "off": 237.7, "ret": 127.2, "dem": 585.3}, {"h": 13, "pv": 694.6, "res": 209.4, "off": 254.7, "ret": 133.1, "dem": 597.1}, {"h": 14, "pv": 664.4, "res": 203.8, "off": 271.7, "ret": 137.0, "dem": 612.5}, {"h": 15, "pv": 588.9, "res": 209.4, "off": 278.5, "ret": 140.9, "dem": 628.7}, {"h": 16, "pv": 437.9, "res": 231.4, "off": 254.7, "ret": 137.0, "dem": 623.1}, {"h": 17, "pv": 264.2, "res": 286.5, "off": 203.8, "ret": 127.2, "dem": 617.5}, {"h": 18, "pv": 113.2, "res": 330.6, "off": 118.9, "ret": 107.6, "dem": 557.1}, {"h": 19, "pv": 30.2, "res": 341.6, "off": 67.9, "ret": 88.1, "dem": 497.6}, {"h": 20, "pv": 0.0, "res": 319.5, "off": 50.9, "ret": 68.5, "dem": 439.0}, {"h": 21, "pv": 0.0, "res": 286.5, "off": 34.0, "ret": 39.1, "dem": 359.6}, {"h": 22, "pv": 0.0, "res": 247.9, "off": 27.2, "ret": 23.5, "dem": 298.6}, {"h": 23, "pv": 0.0, "res": 220.4, "off": 17.0, "ret": 15.7, "dem": 253.0}]}, {"block": 10, "residents": 337, "kwp": 228.0, "annual_pv": 346174, "annual_dem": 1655970, "self_suff": 20.9, "res_share": 77.8, "off_share": 18.1, "ret_share": 4.1, "summer": [{"h": 0, "pv": 0.0, "res": 123.6, "off": 4.1, "ret": 0.9, "dem": 128.6}, {"h": 1, "pv": 0.0, "res": 105.9, "off": 4.1, "ret": 0.9, "dem": 111.0}, {"h": 2, "pv": 0.0, "res": 98.9, "off": 4.1, "ret": 0.9, "dem": 103.9}, {"h": 3, "pv": 0.0, "res": 95.3, "off": 4.1, "ret": 0.9, "dem": 100.4}, {"h": 4, "pv": 0.0, "res": 98.9, "off": 4.1, "ret": 0.9, "dem": 103.9}, {"h": 5, "pv": 0.0, "res": 113.0, "off": 8.2, "ret": 1.8, "dem": 123.1}, {"h": 6, "pv": 26.1, "res": 148.3, "off": 12.3, "ret": 2.8, "dem": 163.4}, {"h": 7, "pv": 104.6, "res": 194.2, "off": 20.5, "ret": 4.6, "dem": 219.4}, {"h": 8, "pv": 261.4, "res": 169.5, "off": 53.4, "ret": 11.1, "dem": 233.9}, {"h": 9, "pv": 522.8, "res": 141.2, "off": 61.6, "ret": 12.9, "dem": 215.8}, {"h": 10, "pv": 784.1, "res": 134.2, "off": 65.7, "ret": 13.9, "dem": 213.7}, {"h": 11, "pv": 1019.4, "res": 134.2, "off": 67.3, "ret": 14.4, "dem": 215.9}, {"h": 12, "pv": 1150.1, "res": 141.2, "off": 57.5, "ret": 12.0, "dem": 210.7}, {"h": 13, "pv": 1202.4, "res": 134.2, "off": 61.6, "ret": 12.6, "dem": 208.3}, {"h": 14, "pv": 1150.1, "res": 130.7, "off": 65.7, "ret": 12.9, "dem": 209.3}, {"h": 15, "pv": 1019.4, "res": 134.2, "off": 67.3, "ret": 13.3, "dem": 214.8}, {"h": 16, "pv": 758.0, "res": 148.3, "off": 61.6, "ret": 12.9, "dem": 222.8}, {"h": 17, "pv": 457.4, "res": 183.6, "off": 49.3, "ret": 12.0, "dem": 244.9}, {"h": 18, "pv": 196.0, "res": 211.9, "off": 28.7, "ret": 10.2, "dem": 250.8}, {"h": 19, "pv": 52.3, "res": 218.9, "off": 16.4, "ret": 8.3, "dem": 243.7}, {"h": 20, "pv": 0.0, "res": 204.8, "off": 12.3, "ret": 6.5, "dem": 223.6}, {"h": 21, "pv": 0.0, "res": 183.6, "off": 8.2, "ret": 3.7, "dem": 195.5}, {"h": 22, "pv": 0.0, "res": 158.9, "off": 6.6, "ret": 2.2, "dem": 167.7}, {"h": 23, "pv": 0.0, "res": 141.2, "off": 4.1, "ret": 1.5, "dem": 146.8}], "winter": [{"h": 0, "pv": 0.0, "res": 123.6, "off": 4.1, "ret": 0.9, "dem": 128.6}, {"h": 1, "pv": 0.0, "res": 105.9, "off": 4.1, "ret": 0.9, "dem": 111.0}, {"h": 2, "pv": 0.0, "res": 98.9, "off": 4.1, "ret": 0.9, "dem": 103.9}, {"h": 3, "pv": 0.0, "res": 95.3, "off": 4.1, "ret": 0.9, "dem": 100.4}, {"h": 4, "pv": 0.0, "res": 98.9, "off": 4.1, "ret": 0.9, "dem": 103.9}, {"h": 5, "pv": 0.0, "res": 113.0, "off": 8.2, "ret": 1.8, "dem": 123.1}, {"h": 6, "pv": 13.1, "res": 148.3, "off": 12.3, "ret": 2.8, "dem": 163.4}, {"h": 7, "pv": 52.3, "res": 194.2, "off": 20.5, "ret": 4.6, "dem": 219.4}, {"h": 8, "pv": 130.7, "res": 169.5, "off": 53.4, "ret": 11.1, "dem": 233.9}, {"h": 9, "pv": 261.4, "res": 141.2, "off": 61.6, "ret": 12.9, "dem": 215.8}, {"h": 10, "pv": 392.1, "res": 134.2, "off": 65.7, "ret": 13.9, "dem": 213.7}, {"h": 11, "pv": 509.7, "res": 134.2, "off": 67.3, "ret": 14.4, "dem": 215.9}, {"h": 12, "pv": 575.0, "res": 141.2, "off": 57.5, "ret": 12.0, "dem": 210.7}, {"h": 13, "pv": 601.2, "res": 134.2, "off": 61.6, "ret": 12.6, "dem": 208.3}, {"h": 14, "pv": 575.0, "res": 130.7, "off": 65.7, "ret": 12.9, "dem": 209.3}, {"h": 15, "pv": 509.7, "res": 134.2, "off": 67.3, "ret": 13.3, "dem": 214.8}, {"h": 16, "pv": 379.0, "res": 148.3, "off": 61.6, "ret": 12.9, "dem": 222.8}, {"h": 17, "pv": 228.7, "res": 183.6, "off": 49.3, "ret": 12.0, "dem": 244.9}, {"h": 18, "pv": 98.0, "res": 211.9, "off": 28.7, "ret": 10.2, "dem": 250.8}, {"h": 19, "pv": 26.1, "res": 218.9, "off": 16.4, "ret": 8.3, "dem": 243.7}, {"h": 20, "pv": 0.0, "res": 204.8, "off": 12.3, "ret": 6.5, "dem": 223.6}, {"h": 21, "pv": 0.0, "res": 183.6, "off": 8.2, "ret": 3.7, "dem": 195.5}, {"h": 22, "pv": 0.0, "res": 158.9, "off": 6.6, "ret": 2.2, "dem": 167.7}, {"h": 23, "pv": 0.0, "res": 141.2, "off": 4.1, "ret": 1.5, "dem": 146.8}]}, {"block": 11, "residents": 399, "kwp": 276.5, "annual_pv": 419850, "annual_dem": 2306607, "self_suff": 18.2, "res_share": 66.1, "off_share": 23.4, "ret_share": 10.5, "summer": [{"h": 0, "pv": 0.0, "res": 146.2, "off": 7.4, "ret": 3.3, "dem": 156.9}, {"h": 1, "pv": 0.0, "res": 125.3, "off": 7.4, "ret": 3.3, "dem": 136.0}, {"h": 2, "pv": 0.0, "res": 116.9, "off": 7.4, "ret": 3.3, "dem": 127.7}, {"h": 3, "pv": 0.0, "res": 112.8, "off": 7.4, "ret": 3.3, "dem": 123.5}, {"h": 4, "pv": 0.0, "res": 116.9, "off": 7.4, "ret": 3.3, "dem": 127.7}, {"h": 5, "pv": 0.0, "res": 133.7, "off": 14.8, "ret": 6.6, "dem": 155.1}, {"h": 6, "pv": 31.7, "res": 175.4, "off": 22.2, "ret": 10.0, "dem": 207.6}, {"h": 7, "pv": 126.8, "res": 229.7, "off": 37.0, "ret": 16.6, "dem": 283.3}, {"h": 8, "pv": 317.0, "res": 200.5, "off": 96.1, "ret": 39.8, "dem": 336.4}, {"h": 9, "pv": 634.0, "res": 167.1, "off": 110.9, "ret": 46.5, "dem": 324.5}, {"h": 10, "pv": 951.0, "res": 158.7, "off": 118.3, "ret": 49.8, "dem": 326.8}, {"h": 11, "pv": 1236.3, "res": 158.7, "off": 121.3, "ret": 51.8, "dem": 331.8}, {"h": 12, "pv": 1394.9, "res": 167.1, "off": 103.5, "ret": 43.1, "dem": 313.7}, {"h": 13, "pv": 1458.3, "res": 158.7, "off": 110.9, "ret": 45.1, "dem": 314.8}, {"h": 14, "pv": 1394.9, "res": 154.5, "off": 118.3, "ret": 46.5, "dem": 319.3}, {"h": 15, "pv": 1236.3, "res": 158.7, "off": 121.3, "ret": 47.8, "dem": 327.8}, {"h": 16, "pv": 919.3, "res": 175.4, "off": 110.9, "ret": 46.5, "dem": 332.8}, {"h": 17, "pv": 554.8, "res": 217.2, "off": 88.7, "ret": 43.1, "dem": 349.1}, {"h": 18, "pv": 237.8, "res": 250.6, "off": 51.8, "ret": 36.5, "dem": 338.9}, {"h": 19, "pv": 63.4, "res": 259.0, "off": 29.6, "ret": 29.9, "dem": 318.4}, {"h": 20, "pv": 0.0, "res": 242.2, "off": 22.2, "ret": 23.2, "dem": 287.7}, {"h": 21, "pv": 0.0, "res": 217.2, "off": 14.8, "ret": 13.3, "dem": 245.3}, {"h": 22, "pv": 0.0, "res": 187.9, "off": 11.8, "ret": 8.0, "dem": 207.7}, {"h": 23, "pv": 0.0, "res": 167.1, "off": 7.4, "ret": 5.3, "dem": 179.8}], "winter": [{"h": 0, "pv": 0.0, "res": 146.2, "off": 7.4, "ret": 3.3, "dem": 156.9}, {"h": 1, "pv": 0.0, "res": 125.3, "off": 7.4, "ret": 3.3, "dem": 136.0}, {"h": 2, "pv": 0.0, "res": 116.9, "off": 7.4, "ret": 3.3, "dem": 127.7}, {"h": 3, "pv": 0.0, "res": 112.8, "off": 7.4, "ret": 3.3, "dem": 123.5}, {"h": 4, "pv": 0.0, "res": 116.9, "off": 7.4, "ret": 3.3, "dem": 127.7}, {"h": 5, "pv": 0.0, "res": 133.7, "off": 14.8, "ret": 6.6, "dem": 155.1}, {"h": 6, "pv": 15.9, "res": 175.4, "off": 22.2, "ret": 10.0, "dem": 207.6}, {"h": 7, "pv": 63.4, "res": 229.7, "off": 37.0, "ret": 16.6, "dem": 283.3}, {"h": 8, "pv": 158.5, "res": 200.5, "off": 96.1, "ret": 39.8, "dem": 336.4}, {"h": 9, "pv": 317.0, "res": 167.1, "off": 110.9, "ret": 46.5, "dem": 324.5}, {"h": 10, "pv": 475.5, "res": 158.7, "off": 118.3, "ret": 49.8, "dem": 326.8}, {"h": 11, "pv": 618.2, "res": 158.7, "off": 121.3, "ret": 51.8, "dem": 331.8}, {"h": 12, "pv": 697.4, "res": 167.1, "off": 103.5, "ret": 43.1, "dem": 313.7}, {"h": 13, "pv": 729.1, "res": 158.7, "off": 110.9, "ret": 45.1, "dem": 314.8}, {"h": 14, "pv": 697.4, "res": 154.5, "off": 118.3, "ret": 46.5, "dem": 319.3}, {"h": 15, "pv": 618.2, "res": 158.7, "off": 121.3, "ret": 47.8, "dem": 327.8}, {"h": 16, "pv": 459.7, "res": 175.4, "off": 110.9, "ret": 46.5, "dem": 332.8}, {"h": 17, "pv": 277.4, "res": 217.2, "off": 88.7, "ret": 43.1, "dem": 349.1}, {"h": 18, "pv": 118.9, "res": 250.6, "off": 51.8, "ret": 36.5, "dem": 338.9}, {"h": 19, "pv": 31.7, "res": 259.0, "off": 29.6, "ret": 29.9, "dem": 318.4}, {"h": 20, "pv": 0.0, "res": 242.2, "off": 22.2, "ret": 23.2, "dem": 287.7}, {"h": 21, "pv": 0.0, "res": 217.2, "off": 14.8, "ret": 13.3, "dem": 245.3}, {"h": 22, "pv": 0.0, "res": 187.9, "off": 11.8, "ret": 8.0, "dem": 207.7}, {"h": 23, "pv": 0.0, "res": 167.1, "off": 7.4, "ret": 5.3, "dem": 179.8}]}, {"block": 12, "residents": 1442, "kwp": 584.1, "annual_pv": 887013, "annual_dem": 7828237, "self_suff": 11.3, "res_share": 70.4, "off_share": 25.0, "ret_share": 4.6, "summer": [{"h": 0, "pv": 0.0, "res": 528.2, "off": 26.8, "ret": 4.9, "dem": 560.0}, {"h": 1, "pv": 0.0, "res": 452.8, "off": 26.8, "ret": 4.9, "dem": 484.5}, {"h": 2, "pv": 0.0, "res": 422.6, "off": 26.8, "ret": 4.9, "dem": 454.3}, {"h": 3, "pv": 0.0, "res": 407.5, "off": 26.8, "ret": 4.9, "dem": 439.3}, {"h": 4, "pv": 0.0, "res": 422.6, "off": 26.8, "ret": 4.9, "dem": 454.3}, {"h": 5, "pv": 0.0, "res": 482.9, "off": 53.7, "ret": 9.9, "dem": 546.5}, {"h": 6, "pv": 67.0, "res": 633.9, "off": 80.5, "ret": 14.8, "dem": 729.2}, {"h": 7, "pv": 267.9, "res": 830.0, "off": 134.2, "ret": 24.7, "dem": 988.9}, {"h": 8, "pv": 669.7, "res": 724.4, "off": 349.0, "ret": 59.2, "dem": 1132.6}, {"h": 9, "pv": 1339.5, "res": 603.7, "off": 402.6, "ret": 69.1, "dem": 1075.4}, {"h": 10, "pv": 2009.2, "res": 573.5, "off": 429.5, "ret": 74.0, "dem": 1077.0}, {"h": 11, "pv": 2612.0, "res": 573.5, "off": 440.2, "ret": 77.0, "dem": 1090.7}, {"h": 12, "pv": 2946.9, "res": 603.7, "off": 375.8, "ret": 64.2, "dem": 1043.6}, {"h": 13, "pv": 3080.8, "res": 573.5, "off": 402.6, "ret": 67.1, "dem": 1043.2}, {"h": 14, "pv": 2946.9, "res": 558.4, "off": 429.5, "ret": 69.1, "dem": 1057.0}, {"h": 15, "pv": 2612.0, "res": 573.5, "off": 440.2, "ret": 71.1, "dem": 1084.8}, {"h": 16, "pv": 1942.3, "res": 633.9, "off": 402.6, "ret": 69.1, "dem": 1105.6}, {"h": 17, "pv": 1172.1, "res": 784.8, "off": 322.1, "ret": 64.2, "dem": 1171.0}, {"h": 18, "pv": 502.3, "res": 905.5, "off": 187.9, "ret": 54.3, "dem": 1147.7}, {"h": 19, "pv": 133.9, "res": 935.7, "off": 107.4, "ret": 44.4, "dem": 1087.5}, {"h": 20, "pv": 0.0, "res": 875.3, "off": 80.5, "ret": 34.5, "dem": 990.4}, {"h": 21, "pv": 0.0, "res": 784.8, "off": 53.7, "ret": 19.7, "dem": 858.2}, {"h": 22, "pv": 0.0, "res": 679.1, "off": 42.9, "ret": 11.8, "dem": 733.9}, {"h": 23, "pv": 0.0, "res": 603.7, "off": 26.8, "ret": 7.9, "dem": 638.4}], "winter": [{"h": 0, "pv": 0.0, "res": 528.2, "off": 26.8, "ret": 4.9, "dem": 560.0}, {"h": 1, "pv": 0.0, "res": 452.8, "off": 26.8, "ret": 4.9, "dem": 484.5}, {"h": 2, "pv": 0.0, "res": 422.6, "off": 26.8, "ret": 4.9, "dem": 454.3}, {"h": 3, "pv": 0.0, "res": 407.5, "off": 26.8, "ret": 4.9, "dem": 439.3}, {"h": 4, "pv": 0.0, "res": 422.6, "off": 26.8, "ret": 4.9, "dem": 454.3}, {"h": 5, "pv": 0.0, "res": 482.9, "off": 53.7, "ret": 9.9, "dem": 546.5}, {"h": 6, "pv": 33.5, "res": 633.9, "off": 80.5, "ret": 14.8, "dem": 729.2}, {"h": 7, "pv": 133.9, "res": 830.0, "off": 134.2, "ret": 24.7, "dem": 988.9}, {"h": 8, "pv": 334.9, "res": 724.4, "off": 349.0, "ret": 59.2, "dem": 1132.6}, {"h": 9, "pv": 669.7, "res": 603.7, "off": 402.6, "ret": 69.1, "dem": 1075.4}, {"h": 10, "pv": 1004.6, "res": 573.5, "off": 429.5, "ret": 74.0, "dem": 1077.0}, {"h": 11, "pv": 1306.0, "res": 573.5, "off": 440.2, "ret": 77.0, "dem": 1090.7}, {"h": 12, "pv": 1473.4, "res": 603.7, "off": 375.8, "ret": 64.2, "dem": 1043.6}, {"h": 13, "pv": 1540.4, "res": 573.5, "off": 402.6, "ret": 67.1, "dem": 1043.2}, {"h": 14, "pv": 1473.4, "res": 558.4, "off": 429.5, "ret": 69.1, "dem": 1057.0}, {"h": 15, "pv": 1306.0, "res": 573.5, "off": 440.2, "ret": 71.1, "dem": 1084.8}, {"h": 16, "pv": 971.1, "res": 633.9, "off": 402.6, "ret": 69.1, "dem": 1105.6}, {"h": 17, "pv": 586.0, "res": 784.8, "off": 322.1, "ret": 64.2, "dem": 1171.0}, {"h": 18, "pv": 251.2, "res": 905.5, "off": 187.9, "ret": 54.3, "dem": 1147.7}, {"h": 19, "pv": 67.0, "res": 935.7, "off": 107.4, "ret": 44.4, "dem": 1087.5}, {"h": 20, "pv": 0.0, "res": 875.3, "off": 80.5, "ret": 34.5, "dem": 990.4}, {"h": 21, "pv": 0.0, "res": 784.8, "off": 53.7, "ret": 19.7, "dem": 858.2}, {"h": 22, "pv": 0.0, "res": 679.1, "off": 42.9, "ret": 11.8, "dem": 733.9}, {"h": 23, "pv": 0.0, "res": 603.7, "off": 26.8, "ret": 7.9, "dem": 638.4}]}, {"block": 13, "residents": 797, "kwp": 265.8, "annual_pv": 403662, "annual_dem": 4398777, "self_suff": 9.2, "res_share": 69.2, "off_share": 23.0, "ret_share": 7.8, "summer": [{"h": 0, "pv": 0.0, "res": 291.9, "off": 13.8, "ret": 4.7, "dem": 310.5}, {"h": 1, "pv": 0.0, "res": 250.2, "off": 13.8, "ret": 4.7, "dem": 268.8}, {"h": 2, "pv": 0.0, "res": 233.5, "off": 13.8, "ret": 4.7, "dem": 252.1}, {"h": 3, "pv": 0.0, "res": 225.2, "off": 13.8, "ret": 4.7, "dem": 243.7}, {"h": 4, "pv": 0.0, "res": 233.5, "off": 13.8, "ret": 4.7, "dem": 252.1}, {"h": 5, "pv": 0.0, "res": 266.9, "off": 27.7, "ret": 9.4, "dem": 304.0}, {"h": 6, "pv": 30.5, "res": 350.3, "off": 41.5, "ret": 14.2, "dem": 405.9}, {"h": 7, "pv": 121.9, "res": 458.7, "off": 69.2, "ret": 23.6, "dem": 551.5}, {"h": 8, "pv": 304.8, "res": 400.3, "off": 179.9, "ret": 56.7, "dem": 636.8}, {"h": 9, "pv": 609.6, "res": 333.6, "off": 207.5, "ret": 66.1, "dem": 607.2}, {"h": 10, "pv": 914.4, "res": 316.9, "off": 221.4, "ret": 70.8, "dem": 609.1}, {"h": 11, "pv": 1188.7, "res": 316.9, "off": 226.9, "ret": 73.7, "dem": 617.5}, {"h": 12, "pv": 1341.1, "res": 333.6, "off": 193.7, "ret": 61.4, "dem": 588.7}, {"h": 13, "pv": 1402.0, "res": 316.9, "off": 207.5, "ret": 64.2, "dem": 588.7}, {"h": 14, "pv": 1341.1, "res": 308.6, "off": 221.4, "ret": 66.1, "dem": 596.1}, {"h": 15, "pv": 1188.7, "res": 316.9, "off": 226.9, "ret": 68.0, "dem": 611.8}, {"h": 16, "pv": 883.9, "res": 350.3, "off": 207.5, "ret": 66.1, "dem": 623.9}, {"h": 17, "pv": 533.4, "res": 433.7, "off": 166.0, "ret": 61.4, "dem": 661.1}, {"h": 18, "pv": 228.6, "res": 500.4, "off": 96.9, "ret": 51.9, "dem": 649.2}, {"h": 19, "pv": 61.0, "res": 517.1, "off": 55.3, "ret": 42.5, "dem": 614.9}, {"h": 20, "pv": 0.0, "res": 483.7, "off": 41.5, "ret": 33.0, "dem": 558.3}, {"h": 21, "pv": 0.0, "res": 433.7, "off": 27.7, "ret": 18.9, "dem": 480.2}, {"h": 22, "pv": 0.0, "res": 375.3, "off": 22.1, "ret": 11.3, "dem": 408.8}, {"h": 23, "pv": 0.0, "res": 333.6, "off": 13.8, "ret": 7.6, "dem": 355.0}], "winter": [{"h": 0, "pv": 0.0, "res": 291.9, "off": 13.8, "ret": 4.7, "dem": 310.5}, {"h": 1, "pv": 0.0, "res": 250.2, "off": 13.8, "ret": 4.7, "dem": 268.8}, {"h": 2, "pv": 0.0, "res": 233.5, "off": 13.8, "ret": 4.7, "dem": 252.1}, {"h": 3, "pv": 0.0, "res": 225.2, "off": 13.8, "ret": 4.7, "dem": 243.7}, {"h": 4, "pv": 0.0, "res": 233.5, "off": 13.8, "ret": 4.7, "dem": 252.1}, {"h": 5, "pv": 0.0, "res": 266.9, "off": 27.7, "ret": 9.4, "dem": 304.0}, {"h": 6, "pv": 15.2, "res": 350.3, "off": 41.5, "ret": 14.2, "dem": 405.9}, {"h": 7, "pv": 61.0, "res": 458.7, "off": 69.2, "ret": 23.6, "dem": 551.5}, {"h": 8, "pv": 152.4, "res": 400.3, "off": 179.9, "ret": 56.7, "dem": 636.8}, {"h": 9, "pv": 304.8, "res": 333.6, "off": 207.5, "ret": 66.1, "dem": 607.2}, {"h": 10, "pv": 457.2, "res": 316.9, "off": 221.4, "ret": 70.8, "dem": 609.1}, {"h": 11, "pv": 594.3, "res": 316.9, "off": 226.9, "ret": 73.7, "dem": 617.5}, {"h": 12, "pv": 670.5, "res": 333.6, "off": 193.7, "ret": 61.4, "dem": 588.7}, {"h": 13, "pv": 701.0, "res": 316.9, "off": 207.5, "ret": 64.2, "dem": 588.7}, {"h": 14, "pv": 670.5, "res": 308.6, "off": 221.4, "ret": 66.1, "dem": 596.1}, {"h": 15, "pv": 594.3, "res": 316.9, "off": 226.9, "ret": 68.0, "dem": 611.8}, {"h": 16, "pv": 441.9, "res": 350.3, "off": 207.5, "ret": 66.1, "dem": 623.9}, {"h": 17, "pv": 266.7, "res": 433.7, "off": 166.0, "ret": 61.4, "dem": 661.1}, {"h": 18, "pv": 114.3, "res": 500.4, "off": 96.9, "ret": 51.9, "dem": 649.2}, {"h": 19, "pv": 30.5, "res": 517.1, "off": 55.3, "ret": 42.5, "dem": 614.9}, {"h": 20, "pv": 0.0, "res": 483.7, "off": 41.5, "ret": 33.0, "dem": 558.3}, {"h": 21, "pv": 0.0, "res": 433.7, "off": 27.7, "ret": 18.9, "dem": 480.2}, {"h": 22, "pv": 0.0, "res": 375.3, "off": 22.1, "ret": 11.3, "dem": 408.8}, {"h": 23, "pv": 0.0, "res": 333.6, "off": 13.8, "ret": 7.6, "dem": 355.0}]}, {"block": 14, "residents": 786, "kwp": 211.5, "annual_pv": 321223, "annual_dem": 4090262, "self_suff": 7.9, "res_share": 73.4, "off_share": 17.3, "ret_share": 9.3, "summer": [{"h": 0, "pv": 0.0, "res": 288.0, "off": 9.7, "ret": 5.2, "dem": 302.9}, {"h": 1, "pv": 0.0, "res": 246.8, "off": 9.7, "ret": 5.2, "dem": 261.7}, {"h": 2, "pv": 0.0, "res": 230.4, "off": 9.7, "ret": 5.2, "dem": 245.3}, {"h": 3, "pv": 0.0, "res": 222.1, "off": 9.7, "ret": 5.2, "dem": 237.0}, {"h": 4, "pv": 0.0, "res": 230.4, "off": 9.7, "ret": 5.2, "dem": 245.3}, {"h": 5, "pv": 0.0, "res": 263.3, "off": 19.4, "ret": 10.4, "dem": 293.1}, {"h": 6, "pv": 24.3, "res": 345.6, "off": 29.1, "ret": 15.6, "dem": 390.2}, {"h": 7, "pv": 97.0, "res": 452.5, "off": 48.5, "ret": 25.9, "dem": 527.0}, {"h": 8, "pv": 242.5, "res": 394.9, "off": 126.2, "ret": 62.2, "dem": 583.4}, {"h": 9, "pv": 485.1, "res": 329.1, "off": 145.6, "ret": 72.6, "dem": 547.3}, {"h": 10, "pv": 727.6, "res": 312.6, "off": 155.4, "ret": 77.8, "dem": 545.8}, {"h": 11, "pv": 945.9, "res": 312.6, "off": 159.2, "ret": 80.9, "dem": 552.8}, {"h": 12, "pv": 1067.2, "res": 329.1, "off": 135.9, "ret": 67.4, "dem": 532.4}, {"h": 13, "pv": 1115.7, "res": 312.6, "off": 145.6, "ret": 70.5, "dem": 528.8}, {"h": 14, "pv": 1067.2, "res": 304.4, "off": 155.4, "ret": 72.6, "dem": 532.3}, {"h": 15, "pv": 945.9, "res": 312.6, "off": 159.2, "ret": 74.6, "dem": 546.5}, {"h": 16, "pv": 703.4, "res": 345.6, "off": 145.6, "ret": 72.6, "dem": 563.8}, {"h": 17, "pv": 424.5, "res": 427.8, "off": 116.5, "ret": 67.4, "dem": 611.7}, {"h": 18, "pv": 181.9, "res": 493.7, "off": 68.0, "ret": 57.0, "dem": 618.6}, {"h": 19, "pv": 48.5, "res": 510.1, "off": 38.8, "ret": 46.7, "dem": 595.6}, {"h": 20, "pv": 0.0, "res": 477.2, "off": 29.1, "ret": 36.3, "dem": 542.6}, {"h": 21, "pv": 0.0, "res": 427.8, "off": 19.4, "ret": 20.7, "dem": 468.0}, {"h": 22, "pv": 0.0, "res": 370.2, "off": 15.5, "ret": 12.4, "dem": 398.2}, {"h": 23, "pv": 0.0, "res": 329.1, "off": 9.7, "ret": 8.3, "dem": 347.1}], "winter": [{"h": 0, "pv": 0.0, "res": 288.0, "off": 9.7, "ret": 5.2, "dem": 302.9}, {"h": 1, "pv": 0.0, "res": 246.8, "off": 9.7, "ret": 5.2, "dem": 261.7}, {"h": 2, "pv": 0.0, "res": 230.4, "off": 9.7, "ret": 5.2, "dem": 245.3}, {"h": 3, "pv": 0.0, "res": 222.1, "off": 9.7, "ret": 5.2, "dem": 237.0}, {"h": 4, "pv": 0.0, "res": 230.4, "off": 9.7, "ret": 5.2, "dem": 245.3}, {"h": 5, "pv": 0.0, "res": 263.3, "off": 19.4, "ret": 10.4, "dem": 293.1}, {"h": 6, "pv": 12.1, "res": 345.6, "off": 29.1, "ret": 15.6, "dem": 390.2}, {"h": 7, "pv": 48.5, "res": 452.5, "off": 48.5, "ret": 25.9, "dem": 527.0}, {"h": 8, "pv": 121.3, "res": 394.9, "off": 126.2, "ret": 62.2, "dem": 583.4}, {"h": 9, "pv": 242.5, "res": 329.1, "off": 145.6, "ret": 72.6, "dem": 547.3}, {"h": 10, "pv": 363.8, "res": 312.6, "off": 155.4, "ret": 77.8, "dem": 545.8}, {"h": 11, "pv": 473.0, "res": 312.6, "off": 159.2, "ret": 80.9, "dem": 552.8}, {"h": 12, "pv": 533.6, "res": 329.1, "off": 135.9, "ret": 67.4, "dem": 532.4}, {"h": 13, "pv": 557.8, "res": 312.6, "off": 145.6, "ret": 70.5, "dem": 528.8}, {"h": 14, "pv": 533.6, "res": 304.4, "off": 155.4, "ret": 72.6, "dem": 532.3}, {"h": 15, "pv": 473.0, "res": 312.6, "off": 159.2, "ret": 74.6, "dem": 546.5}, {"h": 16, "pv": 351.7, "res": 345.6, "off": 145.6, "ret": 72.6, "dem": 563.8}, {"h": 17, "pv": 212.2, "res": 427.8, "off": 116.5, "ret": 67.4, "dem": 611.7}, {"h": 18, "pv": 91.0, "res": 493.7, "off": 68.0, "ret": 57.0, "dem": 618.6}, {"h": 19, "pv": 24.3, "res": 510.1, "off": 38.8, "ret": 46.7, "dem": 595.6}, {"h": 20, "pv": 0.0, "res": 477.2, "off": 29.1, "ret": 36.3, "dem": 542.6}, {"h": 21, "pv": 0.0, "res": 427.8, "off": 19.4, "ret": 20.7, "dem": 468.0}, {"h": 22, "pv": 0.0, "res": 370.2, "off": 15.5, "ret": 12.4, "dem": 398.2}, {"h": 23, "pv": 0.0, "res": 329.1, "off": 9.7, "ret": 8.3, "dem": 347.1}]}, {"block": 15, "residents": 754, "kwp": 224.4, "annual_pv": 340764, "annual_dem": 3145310, "self_suff": 10.8, "res_share": 91.6, "off_share": 6.0, "ret_share": 2.4, "summer": [{"h": 0, "pv": 0.0, "res": 276.4, "off": 2.6, "ret": 1.0, "dem": 280.0}, {"h": 1, "pv": 0.0, "res": 236.9, "off": 2.6, "ret": 1.0, "dem": 240.5}, {"h": 2, "pv": 0.0, "res": 221.1, "off": 2.6, "ret": 1.0, "dem": 224.7}, {"h": 3, "pv": 0.0, "res": 213.2, "off": 2.6, "ret": 1.0, "dem": 216.8}, {"h": 4, "pv": 0.0, "res": 221.1, "off": 2.6, "ret": 1.0, "dem": 224.7}, {"h": 5, "pv": 0.0, "res": 252.7, "off": 5.2, "ret": 2.1, "dem": 259.9}, {"h": 6, "pv": 25.7, "res": 331.6, "off": 7.7, "ret": 3.1, "dem": 342.5}, {"h": 7, "pv": 102.9, "res": 434.3, "off": 12.9, "ret": 5.2, "dem": 452.3}, {"h": 8, "pv": 257.3, "res": 379.0, "off": 33.5, "ret": 12.4, "dem": 424.9}, {"h": 9, "pv": 514.6, "res": 315.8, "off": 38.6, "ret": 14.4, "dem": 368.9}, {"h": 10, "pv": 771.9, "res": 300.1, "off": 41.2, "ret": 15.5, "dem": 356.7}, {"h": 11, "pv": 1003.5, "res": 300.1, "off": 42.2, "ret": 16.1, "dem": 358.4}, {"h": 12, "pv": 1132.1, "res": 315.8, "off": 36.1, "ret": 13.4, "dem": 365.3}, {"h": 13, "pv": 1183.6, "res": 300.1, "off": 38.6, "ret": 14.0, "dem": 352.7}, {"h": 14, "pv": 1132.1, "res": 292.2, "off": 41.2, "ret": 14.4, "dem": 347.8}, {"h": 15, "pv": 1003.5, "res": 300.1, "off": 42.2, "ret": 14.8, "dem": 357.1}, {"h": 16, "pv": 746.2, "res": 331.6, "off": 38.6, "ret": 14.4, "dem": 384.7}, {"h": 17, "pv": 450.3, "res": 410.6, "off": 30.9, "ret": 13.4, "dem": 454.9}, {"h": 18, "pv": 193.0, "res": 473.8, "off": 18.0, "ret": 11.3, "dem": 503.1}, {"h": 19, "pv": 51.5, "res": 489.6, "off": 10.3, "ret": 9.3, "dem": 509.1}, {"h": 20, "pv": 0.0, "res": 458.0, "off": 7.7, "ret": 7.2, "dem": 472.9}, {"h": 21, "pv": 0.0, "res": 410.6, "off": 5.2, "ret": 4.1, "dem": 419.9}, {"h": 22, "pv": 0.0, "res": 355.3, "off": 4.1, "ret": 2.5, "dem": 361.9}, {"h": 23, "pv": 0.0, "res": 315.8, "off": 2.6, "ret": 1.6, "dem": 320.1}], "winter": [{"h": 0, "pv": 0.0, "res": 276.4, "off": 2.6, "ret": 1.0, "dem": 280.0}, {"h": 1, "pv": 0.0, "res": 236.9, "off": 2.6, "ret": 1.0, "dem": 240.5}, {"h": 2, "pv": 0.0, "res": 221.1, "off": 2.6, "ret": 1.0, "dem": 224.7}, {"h": 3, "pv": 0.0, "res": 213.2, "off": 2.6, "ret": 1.0, "dem": 216.8}, {"h": 4, "pv": 0.0, "res": 221.1, "off": 2.6, "ret": 1.0, "dem": 224.7}, {"h": 5, "pv": 0.0, "res": 252.7, "off": 5.2, "ret": 2.1, "dem": 259.9}, {"h": 6, "pv": 12.9, "res": 331.6, "off": 7.7, "ret": 3.1, "dem": 342.5}, {"h": 7, "pv": 51.5, "res": 434.3, "off": 12.9, "ret": 5.2, "dem": 452.3}, {"h": 8, "pv": 128.6, "res": 379.0, "off": 33.5, "ret": 12.4, "dem": 424.9}, {"h": 9, "pv": 257.3, "res": 315.8, "off": 38.6, "ret": 14.4, "dem": 368.9}, {"h": 10, "pv": 385.9, "res": 300.1, "off": 41.2, "ret": 15.5, "dem": 356.7}, {"h": 11, "pv": 501.7, "res": 300.1, "off": 42.2, "ret": 16.1, "dem": 358.4}, {"h": 12, "pv": 566.1, "res": 315.8, "off": 36.1, "ret": 13.4, "dem": 365.3}, {"h": 13, "pv": 591.8, "res": 300.1, "off": 38.6, "ret": 14.0, "dem": 352.7}, {"h": 14, "pv": 566.1, "res": 292.2, "off": 41.2, "ret": 14.4, "dem": 347.8}, {"h": 15, "pv": 501.7, "res": 300.1, "off": 42.2, "ret": 14.8, "dem": 357.1}, {"h": 16, "pv": 373.1, "res": 331.6, "off": 38.6, "ret": 14.4, "dem": 384.7}, {"h": 17, "pv": 225.1, "res": 410.6, "off": 30.9, "ret": 13.4, "dem": 454.9}, {"h": 18, "pv": 96.5, "res": 473.8, "off": 18.0, "ret": 11.3, "dem": 503.1}, {"h": 19, "pv": 25.7, "res": 489.6, "off": 10.3, "ret": 9.3, "dem": 509.1}, {"h": 20, "pv": 0.0, "res": 458.0, "off": 7.7, "ret": 7.2, "dem": 472.9}, {"h": 21, "pv": 0.0, "res": 410.6, "off": 5.2, "ret": 4.1, "dem": 419.9}, {"h": 22, "pv": 0.0, "res": 355.3, "off": 4.1, "ret": 2.5, "dem": 361.9}, {"h": 23, "pv": 0.0, "res": 315.8, "off": 2.6, "ret": 1.6, "dem": 320.1}]}, {"block": 16, "residents": 813, "kwp": 175.4, "annual_pv": 266388, "annual_dem": 4184253, "self_suff": 6.4, "res_share": 74.3, "off_share": 16.6, "ret_share": 9.2, "summer": [{"h": 0, "pv": 0.0, "res": 297.9, "off": 9.5, "ret": 5.3, "dem": 312.7}, {"h": 1, "pv": 0.0, "res": 255.4, "off": 9.5, "ret": 5.3, "dem": 270.1}, {"h": 2, "pv": 0.0, "res": 238.3, "off": 9.5, "ret": 5.3, "dem": 253.1}, {"h": 3, "pv": 0.0, "res": 229.8, "off": 9.5, "ret": 5.3, "dem": 244.6}, {"h": 4, "pv": 0.0, "res": 238.3, "off": 9.5, "ret": 5.3, "dem": 253.1}, {"h": 5, "pv": 0.0, "res": 272.4, "off": 19.0, "ret": 10.5, "dem": 301.9}, {"h": 6, "pv": 20.1, "res": 357.5, "off": 28.5, "ret": 15.8, "dem": 401.8}, {"h": 7, "pv": 80.5, "res": 468.2, "off": 47.4, "ret": 26.4, "dem": 541.9}, {"h": 8, "pv": 201.1, "res": 408.6, "off": 123.3, "ret": 63.2, "dem": 595.2}, {"h": 9, "pv": 402.3, "res": 340.5, "off": 142.3, "ret": 73.8, "dem": 556.6}, {"h": 10, "pv": 603.4, "res": 323.5, "off": 151.8, "ret": 79.1, "dem": 554.3}, {"h": 11, "pv": 784.4, "res": 323.5, "off": 155.6, "ret": 82.2, "dem": 561.3}, {"h": 12, "pv": 885.0, "res": 340.5, "off": 132.8, "ret": 68.5, "dem": 541.8}, {"h": 13, "pv": 925.2, "res": 323.5, "off": 142.3, "ret": 71.7, "dem": 537.5}, {"h": 14, "pv": 885.0, "res": 314.9, "off": 151.8, "ret": 73.8, "dem": 540.5}, {"h": 15, "pv": 784.4, "res": 323.5, "off": 155.6, "ret": 75.9, "dem": 555.0}, {"h": 16, "pv": 583.3, "res": 357.5, "off": 142.3, "ret": 73.8, "dem": 573.6}, {"h": 17, "pv": 352.0, "res": 442.6, "off": 113.9, "ret": 68.5, "dem": 625.0}, {"h": 18, "pv": 150.9, "res": 510.7, "off": 66.4, "ret": 58.0, "dem": 635.1}, {"h": 19, "pv": 40.2, "res": 527.7, "off": 38.0, "ret": 47.4, "dem": 613.1}, {"h": 20, "pv": 0.0, "res": 493.7, "off": 28.5, "ret": 36.9, "dem": 559.0}, {"h": 21, "pv": 0.0, "res": 442.6, "off": 19.0, "ret": 21.1, "dem": 482.7}, {"h": 22, "pv": 0.0, "res": 383.0, "off": 15.2, "ret": 12.6, "dem": 410.9}, {"h": 23, "pv": 0.0, "res": 340.5, "off": 9.5, "ret": 8.4, "dem": 358.4}], "winter": [{"h": 0, "pv": 0.0, "res": 297.9, "off": 9.5, "ret": 5.3, "dem": 312.7}, {"h": 1, "pv": 0.0, "res": 255.4, "off": 9.5, "ret": 5.3, "dem": 270.1}, {"h": 2, "pv": 0.0, "res": 238.3, "off": 9.5, "ret": 5.3, "dem": 253.1}, {"h": 3, "pv": 0.0, "res": 229.8, "off": 9.5, "ret": 5.3, "dem": 244.6}, {"h": 4, "pv": 0.0, "res": 238.3, "off": 9.5, "ret": 5.3, "dem": 253.1}, {"h": 5, "pv": 0.0, "res": 272.4, "off": 19.0, "ret": 10.5, "dem": 301.9}, {"h": 6, "pv": 10.1, "res": 357.5, "off": 28.5, "ret": 15.8, "dem": 401.8}, {"h": 7, "pv": 40.2, "res": 468.2, "off": 47.4, "ret": 26.4, "dem": 541.9}, {"h": 8, "pv": 100.6, "res": 408.6, "off": 123.3, "ret": 63.2, "dem": 595.2}, {"h": 9, "pv": 201.1, "res": 340.5, "off": 142.3, "ret": 73.8, "dem": 556.6}, {"h": 10, "pv": 301.7, "res": 323.5, "off": 151.8, "ret": 79.1, "dem": 554.3}, {"h": 11, "pv": 392.2, "res": 323.5, "off": 155.6, "ret": 82.2, "dem": 561.3}, {"h": 12, "pv": 442.5, "res": 340.5, "off": 132.8, "ret": 68.5, "dem": 541.8}, {"h": 13, "pv": 462.6, "res": 323.5, "off": 142.3, "ret": 71.7, "dem": 537.5}, {"h": 14, "pv": 442.5, "res": 314.9, "off": 151.8, "ret": 73.8, "dem": 540.5}, {"h": 15, "pv": 392.2, "res": 323.5, "off": 155.6, "ret": 75.9, "dem": 555.0}, {"h": 16, "pv": 291.7, "res": 357.5, "off": 142.3, "ret": 73.8, "dem": 573.6}, {"h": 17, "pv": 176.0, "res": 442.6, "off": 113.9, "ret": 68.5, "dem": 625.0}, {"h": 18, "pv": 75.4, "res": 510.7, "off": 66.4, "ret": 58.0, "dem": 635.1}, {"h": 19, "pv": 20.1, "res": 527.7, "off": 38.0, "ret": 47.4, "dem": 613.1}, {"h": 20, "pv": 0.0, "res": 493.7, "off": 28.5, "ret": 36.9, "dem": 559.0}, {"h": 21, "pv": 0.0, "res": 442.6, "off": 19.0, "ret": 21.1, "dem": 482.7}, {"h": 22, "pv": 0.0, "res": 383.0, "off": 15.2, "ret": 12.6, "dem": 410.9}, {"h": 23, "pv": 0.0, "res": 340.5, "off": 9.5, "ret": 8.4, "dem": 358.4}]}, {"block": 17, "residents": 669, "kwp": 215.9, "annual_pv": 327861, "annual_dem": 3492894, "self_suff": 9.4, "res_share": 73.2, "off_share": 21.5, "ret_share": 5.2, "summer": [{"h": 0, "pv": 0.0, "res": 245.2, "off": 10.3, "ret": 2.5, "dem": 258.1}, {"h": 1, "pv": 0.0, "res": 210.2, "off": 10.3, "ret": 2.5, "dem": 223.0}, {"h": 2, "pv": 0.0, "res": 196.2, "off": 10.3, "ret": 2.5, "dem": 209.0}, {"h": 3, "pv": 0.0, "res": 189.2, "off": 10.3, "ret": 2.5, "dem": 202.0}, {"h": 4, "pv": 0.0, "res": 196.2, "off": 10.3, "ret": 2.5, "dem": 209.0}, {"h": 5, "pv": 0.0, "res": 224.2, "off": 20.6, "ret": 5.0, "dem": 249.8}, {"h": 6, "pv": 24.8, "res": 294.3, "off": 30.9, "ret": 7.5, "dem": 332.7}, {"h": 7, "pv": 99.0, "res": 385.4, "off": 51.5, "ret": 12.5, "dem": 449.4}, {"h": 8, "pv": 247.6, "res": 336.3, "off": 134.0, "ret": 30.1, "dem": 500.4}, {"h": 9, "pv": 495.1, "res": 280.3, "off": 154.6, "ret": 35.1, "dem": 470.0}, {"h": 10, "pv": 742.7, "res": 266.3, "off": 164.9, "ret": 37.6, "dem": 468.8}, {"h": 11, "pv": 965.5, "res": 266.3, "off": 169.0, "ret": 39.1, "dem": 474.4}, {"h": 12, "pv": 1089.2, "res": 280.3, "off": 144.3, "ret": 32.6, "dem": 457.2}, {"h": 13, "pv": 1138.8, "res": 266.3, "off": 154.6, "ret": 34.1, "dem": 455.0}, {"h": 14, "pv": 1089.2, "res": 259.3, "off": 164.9, "ret": 35.1, "dem": 459.3}, {"h": 15, "pv": 965.5, "res": 266.3, "off": 169.0, "ret": 36.1, "dem": 471.4}, {"h": 16, "pv": 717.9, "res": 294.3, "off": 154.6, "ret": 35.1, "dem": 484.0}, {"h": 17, "pv": 433.2, "res": 364.4, "off": 123.7, "ret": 32.6, "dem": 520.6}, {"h": 18, "pv": 185.7, "res": 420.4, "off": 72.1, "ret": 27.6, "dem": 520.1}, {"h": 19, "pv": 49.5, "res": 434.4, "off": 41.2, "ret": 22.6, "dem": 498.2}, {"h": 20, "pv": 0.0, "res": 406.4, "off": 30.9, "ret": 17.6, "dem": 454.9}, {"h": 21, "pv": 0.0, "res": 364.4, "off": 20.6, "ret": 10.0, "dem": 395.0}, {"h": 22, "pv": 0.0, "res": 315.3, "off": 16.5, "ret": 6.0, "dem": 337.8}, {"h": 23, "pv": 0.0, "res": 280.3, "off": 10.3, "ret": 4.0, "dem": 294.6}], "winter": [{"h": 0, "pv": 0.0, "res": 245.2, "off": 10.3, "ret": 2.5, "dem": 258.1}, {"h": 1, "pv": 0.0, "res": 210.2, "off": 10.3, "ret": 2.5, "dem": 223.0}, {"h": 2, "pv": 0.0, "res": 196.2, "off": 10.3, "ret": 2.5, "dem": 209.0}, {"h": 3, "pv": 0.0, "res": 189.2, "off": 10.3, "ret": 2.5, "dem": 202.0}, {"h": 4, "pv": 0.0, "res": 196.2, "off": 10.3, "ret": 2.5, "dem": 209.0}, {"h": 5, "pv": 0.0, "res": 224.2, "off": 20.6, "ret": 5.0, "dem": 249.8}, {"h": 6, "pv": 12.4, "res": 294.3, "off": 30.9, "ret": 7.5, "dem": 332.7}, {"h": 7, "pv": 49.5, "res": 385.4, "off": 51.5, "ret": 12.5, "dem": 449.4}, {"h": 8, "pv": 123.8, "res": 336.3, "off": 134.0, "ret": 30.1, "dem": 500.4}, {"h": 9, "pv": 247.6, "res": 280.3, "off": 154.6, "ret": 35.1, "dem": 470.0}, {"h": 10, "pv": 371.3, "res": 266.3, "off": 164.9, "ret": 37.6, "dem": 468.8}, {"h": 11, "pv": 482.7, "res": 266.3, "off": 169.0, "ret": 39.1, "dem": 474.4}, {"h": 12, "pv": 544.6, "res": 280.3, "off": 144.3, "ret": 32.6, "dem": 457.2}, {"h": 13, "pv": 569.4, "res": 266.3, "off": 154.6, "ret": 34.1, "dem": 455.0}, {"h": 14, "pv": 544.6, "res": 259.3, "off": 164.9, "ret": 35.1, "dem": 459.3}, {"h": 15, "pv": 482.7, "res": 266.3, "off": 169.0, "ret": 36.1, "dem": 471.4}, {"h": 16, "pv": 359.0, "res": 294.3, "off": 154.6, "ret": 35.1, "dem": 484.0}, {"h": 17, "pv": 216.6, "res": 364.4, "off": 123.7, "ret": 32.6, "dem": 520.6}, {"h": 18, "pv": 92.8, "res": 420.4, "off": 72.1, "ret": 27.6, "dem": 520.1}, {"h": 19, "pv": 24.8, "res": 434.4, "off": 41.2, "ret": 22.6, "dem": 498.2}, {"h": 20, "pv": 0.0, "res": 406.4, "off": 30.9, "ret": 17.6, "dem": 454.9}, {"h": 21, "pv": 0.0, "res": 364.4, "off": 20.6, "ret": 10.0, "dem": 395.0}, {"h": 22, "pv": 0.0, "res": 315.3, "off": 16.5, "ret": 6.0, "dem": 337.8}, {"h": 23, "pv": 0.0, "res": 280.3, "off": 10.3, "ret": 4.0, "dem": 294.6}]}, {"block": 18, "residents": 1081, "kwp": 280.6, "annual_pv": 426144, "annual_dem": 5040596, "self_suff": 8.5, "res_share": 81.9, "off_share": 14.2, "ret_share": 3.8, "summer": [{"h": 0, "pv": 0.0, "res": 396.1, "off": 9.8, "ret": 2.6, "dem": 408.6}, {"h": 1, "pv": 0.0, "res": 339.5, "off": 9.8, "ret": 2.6, "dem": 352.0}, {"h": 2, "pv": 0.0, "res": 316.9, "off": 9.8, "ret": 2.6, "dem": 329.3}, {"h": 3, "pv": 0.0, "res": 305.6, "off": 9.8, "ret": 2.6, "dem": 318.0}, {"h": 4, "pv": 0.0, "res": 316.9, "off": 9.8, "ret": 2.6, "dem": 329.3}, {"h": 5, "pv": 0.0, "res": 362.1, "off": 19.7, "ret": 5.3, "dem": 387.1}, {"h": 6, "pv": 32.2, "res": 475.3, "off": 29.5, "ret": 7.9, "dem": 512.7}, {"h": 7, "pv": 128.7, "res": 622.4, "off": 49.1, "ret": 13.2, "dem": 684.8}, {"h": 8, "pv": 321.8, "res": 543.2, "off": 127.8, "ret": 31.6, "dem": 702.6}, {"h": 9, "pv": 643.5, "res": 452.7, "off": 147.4, "ret": 36.9, "dem": 637.0}, {"h": 10, "pv": 965.3, "res": 430.0, "off": 157.2, "ret": 39.6, "dem": 626.8}, {"h": 11, "pv": 1254.9, "res": 430.0, "off": 161.2, "ret": 41.1, "dem": 632.4}, {"h": 12, "pv": 1415.8, "res": 452.7, "off": 137.6, "ret": 34.3, "dem": 624.5}, {"h": 13, "pv": 1480.1, "res": 430.0, "off": 147.4, "ret": 35.9, "dem": 613.3}, {"h": 14, "pv": 1415.8, "res": 418.7, "off": 157.2, "ret": 36.9, "dem": 612.9}, {"h": 15, "pv": 1254.9, "res": 430.0, "off": 161.2, "ret": 38.0, "dem": 629.2}, {"h": 16, "pv": 933.1, "res": 475.3, "off": 147.4, "ret": 36.9, "dem": 659.6}, {"h": 17, "pv": 563.1, "res": 588.5, "off": 117.9, "ret": 34.3, "dem": 740.7}, {"h": 18, "pv": 241.3, "res": 679.0, "off": 68.8, "ret": 29.0, "dem": 776.8}, {"h": 19, "pv": 64.4, "res": 701.7, "off": 39.3, "ret": 23.7, "dem": 764.7}, {"h": 20, "pv": 0.0, "res": 656.4, "off": 29.5, "ret": 18.5, "dem": 704.3}, {"h": 21, "pv": 0.0, "res": 588.5, "off": 19.7, "ret": 10.5, "dem": 618.7}, {"h": 22, "pv": 0.0, "res": 509.3, "off": 15.7, "ret": 6.3, "dem": 531.3}, {"h": 23, "pv": 0.0, "res": 452.7, "off": 9.8, "ret": 4.2, "dem": 466.7}], "winter": [{"h": 0, "pv": 0.0, "res": 396.1, "off": 9.8, "ret": 2.6, "dem": 408.6}, {"h": 1, "pv": 0.0, "res": 339.5, "off": 9.8, "ret": 2.6, "dem": 352.0}, {"h": 2, "pv": 0.0, "res": 316.9, "off": 9.8, "ret": 2.6, "dem": 329.3}, {"h": 3, "pv": 0.0, "res": 305.6, "off": 9.8, "ret": 2.6, "dem": 318.0}, {"h": 4, "pv": 0.0, "res": 316.9, "off": 9.8, "ret": 2.6, "dem": 329.3}, {"h": 5, "pv": 0.0, "res": 362.1, "off": 19.7, "ret": 5.3, "dem": 387.1}, {"h": 6, "pv": 16.1, "res": 475.3, "off": 29.5, "ret": 7.9, "dem": 512.7}, {"h": 7, "pv": 64.4, "res": 622.4, "off": 49.1, "ret": 13.2, "dem": 684.8}, {"h": 8, "pv": 160.9, "res": 543.2, "off": 127.8, "ret": 31.6, "dem": 702.6}, {"h": 9, "pv": 321.8, "res": 452.7, "off": 147.4, "ret": 36.9, "dem": 637.0}, {"h": 10, "pv": 482.6, "res": 430.0, "off": 157.2, "ret": 39.6, "dem": 626.8}, {"h": 11, "pv": 627.4, "res": 430.0, "off": 161.2, "ret": 41.1, "dem": 632.4}, {"h": 12, "pv": 707.9, "res": 452.7, "off": 137.6, "ret": 34.3, "dem": 624.5}, {"h": 13, "pv": 740.1, "res": 430.0, "off": 147.4, "ret": 35.9, "dem": 613.3}, {"h": 14, "pv": 707.9, "res": 418.7, "off": 157.2, "ret": 36.9, "dem": 612.9}, {"h": 15, "pv": 627.4, "res": 430.0, "off": 161.2, "ret": 38.0, "dem": 629.2}, {"h": 16, "pv": 466.6, "res": 475.3, "off": 147.4, "ret": 36.9, "dem": 659.6}, {"h": 17, "pv": 281.5, "res": 588.5, "off": 117.9, "ret": 34.3, "dem": 740.7}, {"h": 18, "pv": 120.7, "res": 679.0, "off": 68.8, "ret": 29.0, "dem": 776.8}, {"h": 19, "pv": 32.2, "res": 701.7, "off": 39.3, "ret": 23.7, "dem": 764.7}, {"h": 20, "pv": 0.0, "res": 656.4, "off": 29.5, "ret": 18.5, "dem": 704.3}, {"h": 21, "pv": 0.0, "res": 588.5, "off": 19.7, "ret": 10.5, "dem": 618.7}, {"h": 22, "pv": 0.0, "res": 509.3, "off": 15.7, "ret": 6.3, "dem": 531.3}, {"h": 23, "pv": 0.0, "res": 452.7, "off": 9.8, "ret": 4.2, "dem": 466.7}]}]
+;
+
+let currentBlock = 0;
+let currentSeason = 'summer';
+let chart = null;
+
+function setSeason(s) {
+  currentSeason = s;
+  document.querySelectorAll('.season-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderChart(currentBlock);
+}
+
+function suffClass(s) {
+  if (s < 8) return 'suff-low';
+  if (s < 14) return 'suff-mid';
+  return 'suff-high';
+}
+
+function formatKwh(v) {
+  if (v >= 1000000) return (v/1000000).toFixed(2) + ' GWh';
+  if (v >= 1000) return (v/1000).toFixed(0) + ' MWh';
+  return v.toFixed(0) + ' kWh';
+}
+
+function buildBlockList() {
+  const el = document.getElementById('blockList');
+  el.innerHTML = BLOCKS.map((b, i) => `
+    <div class="block-item ${i===0?'active':''}" onclick="selectBlock(${i})" id="item-${i}">
+      <div class="block-num">${b.block}</div>
+      <div class="block-meta">
+        <div style="font-size:0.8rem;color:#cbd5e1">${b.residents} res · ${b.kwp} kWp</div>
+        <div class="block-meta-res">${b.res_share}% res / ${b.off_share}% off / ${b.ret_share}% ret</div>
+      </div>
+      <div class="block-suff ${suffClass(b.self_suff)}">${b.self_suff}%</div>
+    </div>
+  `).join('');
+}
+
+function selectBlock(i) {
+  currentBlock = i;
+  document.querySelectorAll('.block-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`item-${i}`).classList.add('active');
+  renderChart(i);
+}
+
+function renderChart(i) {
+  const b = BLOCKS[i];
+  const data = currentSeason === 'summer' ? b.summer : b.winter;
+  const hours = data.map(d => `${String(d.h).padStart(2,'0')}:00`);
+
+  // Update header
+  document.getElementById('blockTitle').textContent = `Block ${b.block}`;
+
+  const annualPV = formatKwh(b.annual_pv);
+  const annualDem = formatKwh(b.annual_dem);
+  const seasonLabel = currentSeason === 'summer' ? 'Jul' : 'Jan';
+
+  // Surplus hours
+  const surplusHours = data.filter(d => d.pv > d.dem).length;
+  const surplusKwh = data.filter(d => d.pv > d.dem).reduce((s,d) => s + (d.pv - d.dem), 0);
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-chip">
+      <div class="stat-label">Installed PV</div>
+      <div class="stat-val" style="color:var(--amber)">${b.kwp} kWp</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-label">Annual PV</div>
+      <div class="stat-val" style="color:var(--amber)">${annualPV}/yr</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-label">Annual demand</div>
+      <div class="stat-val" style="color:var(--blue)">${annualDem}/yr</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-label">Self-sufficiency</div>
+      <div class="stat-val" style="color:${b.self_suff>=14?'var(--green)':b.self_suff>=8?'var(--amber)':'var(--red)'}">${b.self_suff}%</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-label">Residents</div>
+      <div class="stat-val" style="color:var(--muted)">${b.residents}</div>
+    </div>
+  `;
+
+  if (surplusHours > 0) {
+    document.getElementById('surplusInfo').innerHTML = `
+      <div class="surplus-info">
+        <span>✦ ${surplusHours}h surplus · ${surplusKwh.toFixed(0)} kWh/day (${seasonLabel})</span>
+      </div>`;
+  } else {
+    document.getElementById('surplusInfo').innerHTML = `
+      <div class="no-surplus">No surplus — ${seasonLabel} deficit all day</div>`;
+  }
+
+  // Build datasets
+  const pvData = data.map(d => d.pv);
+  const resData = data.map(d => d.res);
+  const offData = data.map(d => d.off);
+  const retData = data.map(d => d.ret);
+  const demData = data.map(d => d.dem);
+
+  // Surplus/deficit fill between PV and demand
+  const surplusData = data.map(d => Math.max(0, d.pv - d.dem));
+  const deficitData = data.map(d => Math.max(0, d.dem - d.pv));
+
+  if (chart) chart.destroy();
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [
+        {
+          label: 'PV Generation',
+          data: pvData,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.05)',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.4,
+          fill: false,
+          order: 1,
+          z: 10,
+        },
+        {
+          label: 'Total Demand',
+          data: demData,
+          borderColor: 'rgba(255,255,255,0.25)',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [5,3],
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false,
+          order: 2,
+        },
+        {
+          label: 'Residential',
+          data: resData,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.08)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: 'origin',
+          order: 5,
+        },
+        {
+          label: 'Office',
+          data: offData,
+          borderColor: '#a78bfa',
+          backgroundColor: 'rgba(167,139,250,0.08)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false,
+          order: 4,
+        },
+        {
+          label: 'Retail',
+          data: retData,
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52,211,153,0.08)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false,
+          order: 3,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1e28',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#e2e8f0',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 11 },
+          padding: 10,
+          callbacks: {
+            title: (items) => `${items[0].label}`,
+            label: (item) => {
+              const val = item.raw.toFixed(1);
+              const balance = pvData[item.dataIndex] - demData[item.dataIndex];
+              if (item.datasetIndex === 0) {
+                return ` PV: ${val} kWh  ${balance > 0 ? '↑ +'+balance.toFixed(0)+' surplus' : '↓ '+Math.abs(balance).toFixed(0)+' deficit'}`;
+              }
+              return ` ${item.dataset.label}: ${val} kWh`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: {
+            color: '#475569',
+            font: { family: 'DM Mono', size: 10 },
+            maxTicksLimit: 12,
+          },
+          border: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: {
+            color: '#475569',
+            font: { family: 'DM Mono', size: 10 },
+            callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v
+          },
+          border: { color: 'rgba(255,255,255,0.05)' },
+          title: {
+            display: true,
+            text: 'kWh / hour',
+            color: '#334155',
+            font: { family: 'DM Mono', size: 10 }
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'surplusShading',
+      beforeDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea) return;
+        const xScale = scales.x;
+        const yScale = scales.y;
+        const d = currentSeason === 'summer' ? BLOCKS[currentBlock].summer : BLOCKS[currentBlock].winter;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+        ctx.clip();
+
+        for (let i = 0; i < d.length - 1; i++) {
+          const x1 = xScale.getPixelForValue(i);
+          const x2 = xScale.getPixelForValue(i + 1);
+          const surplus = d[i].pv > d[i].dem;
+
+          const yTop1 = yScale.getPixelForValue(Math.max(d[i].pv, d[i].dem));
+          const yBot1 = yScale.getPixelForValue(Math.min(d[i].pv, d[i].dem));
+          const yTop2 = yScale.getPixelForValue(Math.max(d[i+1].pv, d[i+1].dem));
+          const yBot2 = yScale.getPixelForValue(Math.min(d[i+1].pv, d[i+1].dem));
+
+          ctx.beginPath();
+          ctx.moveTo(x1, yBot1);
+          ctx.lineTo(x2, yBot2);
+          ctx.lineTo(x2, yTop2);
+          ctx.lineTo(x1, yTop1);
+          ctx.closePath();
+          ctx.fillStyle = surplus ? 'rgba(52,211,153,0.18)' : 'rgba(248,113,113,0.06)';
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+buildBlockList();
+renderChart(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Méridia District — Environmental Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;700&display=swap');
+    
+    body { margin:0; background: #060812; color: #94a3b8; font-family:'Inter', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    .nav-bar {
+      height: 60px;
+      background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; backdrop-filter: blur(10px); z-index: 100;
+    }
+
+    .hero-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #060812;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* --- GHOSTED FORMA BACKGROUND --- */
+    .sim-background {
+      position: absolute; inset: 0;
+      background-image: url('forma-screenshot.png');
+      background-size: cover;
+      background-position: center;
+      
+      /* Blend Mode & Filter to integrate it into the dark theme */
+      opacity: 0.18;
+      filter: grayscale(100%) contrast(150%) brightness(50%) sepia(50%) hue-rotate(180deg) saturate(300%);
+      mix-blend-mode: color-dodge;
+      transform: scale(1.05);
+      z-index: 1;
+    }
+
+    /* Decorative Grid Overlap */
+    .hero-container::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px), 
+                        linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+      background-size: 50px 50px;
+      z-index: 2;
+    }
+
+    .portal-card {
+      position: relative; z-index: 10;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      padding: 48px;
+      width: 520px;
+      text-align: center;
+      backdrop-filter: blur(15px);
+      box-shadow: 0 0 60px rgba(56, 189, 248, 0.1);
+    }
+
+    .btn-launch {
+      display: inline-block;
+      margin-top: 24px;
+      background: #38bdf8;
+      color: #0f172a;
+      padding: 12px 36px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-family: 'DM Mono';
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn-launch:hover {
+      background: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-back {
+      color: #64748b; font-size: 12px; font-family: 'DM Mono'; 
+      transition: color 0.2s;
+    }
+    .btn-back:hover { color: #38bdf8; }
+  </style>
+</head>
+<body>
+
+  <nav class="nav-bar">
+    <div>
+      <span class="text-white font-bold tracking-tight">Méridia District</span>
+      <span class="ml-2 text-[10px] font-mono text-cyan-400">EXTERNAL SIMULATION</span>
+    </div>
+    <a href="index.html" class="btn-back">← RETURN TO DIGITAL TWIN</a>
+  </nav>
+
+  <div class="hero-container">
+    <div class="sim-background"></div>
+
+    <div class="portal-card">
+      <div class="text-cyan-500 font-mono text-xs mb-3 tracking-[0.3em]">AUTODESK FORMA INTERFACE</div>
+      <h2 class="text-3xl font-bold text-white mb-5">Environmental Analysis</h2>
+      <p class="text-sm text-slate-400 mb-8 leading-relaxed px-4">
+        The complete climate simulation requires direct authentication. Click below to launch the advanced analysis workspace in a secure new tab.
+      </p>
+      
+      <div class="py-5 border-y border-slate-800 my-8">
+        <div class="flex justify-around text-[10px] font-mono">
+          <div><span class="block text-cyan-400">WIND FLOW</span>ACTIVE</div>
+          <div><span class="block text-cyan-400">SUN HOURS</span>ACTIVE</div>
+          <div><span class="block text-cyan-400">NOISE MAP</span>READY</div>
+        </div>
+      </div>
+
+      <a href="https://app.autodeskforma.eu/designmode/pro_kaf7ek2eyd/036563a3-00d2-4db4-994e-58c62536aca1" 
+         target="_blank" 
+         class="btn-launch">
+        Launch Simulation Portal ↗
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>
