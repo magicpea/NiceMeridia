@@ -76,14 +76,35 @@
   <div id="tab-content-overall">
     <h1 class="text-white text-xl font-bold mb-1">Neighborhood Overview</h1>
     <p class="text-[10px] font-mono text-sky-400 mb-8 uppercase">Aggregate Data</p>
-    <div class="stat-card mb-4"><div class="label">Total Population</div><div class="text-xl font-bold hl-blue font-mono">7,842</div></div>
-    <div class="stat-card mb-4"><div class="label">Number of Residential Buildings</div><div class="text-xl font-bold hl-green font-mono">Operational</div></div>
+    <div class="stat-card mb-4">
+      <div class="label">Total Population</div>
+      <div class="text-xl font-bold hl-blue font-mono">1,479</div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="stat-card">
+        <div class="label">Total Residents</div>
+        <div class="text-lg font-bold text-white font-mono">7,842</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Project Status</div>
+        <div class="text-lg font-bold hl-green font-mono">Operational</div>
+      </div>
+    </div>
   </div>
 
   <div id="tab-content-mobility" class="hidden">
     <h1 class="text-white text-xl font-bold mb-1">Mobility Overview</h1>
-    <p class="text-[10px] font-mono text-sky-400 mb-8 uppercase">Aggregate Data</p>
-    <div class="stat-card mb-4"><div class="label">Proposed Transport Mode Share</div><br><div style="height:220px"><canvas id="mobilityChart"></canvas></div></div>
+    <p class="text-[10px] font-mono text-sky-400 mb-6 uppercase">Modal Shift Analysis</p>
+    
+    <div class="stat-card mb-4">
+      <div class="label">Current Modal Share</div>
+      <div style="height:180px"><canvas id="mobCurrentChart"></canvas></div>
+    </div>
+
+    <div class="stat-card mb-4">
+      <div class="label">Proposed Modal Share</div>
+      <div style="height:180px"><canvas id="mobProposedChart"></canvas></div>
+    </div>
   </div>
 
   <div id="tab-content-energy" class="hidden">
@@ -145,11 +166,26 @@ let selectedObject = null;
 const interactables = [];
 
 const BLOCKS = [
-  {"type": "building", "block": "A-152", "residents": 465, "kwp": 174.4, "annual_pv": 264.8, "annual_dem": 3.1, "self_suff": 8.6, "summer": [{"pv":0.0,"res":170.5,"off":15.3,"ret":2.8,"dem":188.6},{"pv":20.0,"res":204.6,"off":45.8,"ret":8.4,"dem":258.9},{"pv":880.0,"res":194.9,"off":213.7,"ret":36.5,"dem":445.1},{"pv":150.0,"res":292.3,"off":106.8,"ret":30.9,"dem":430.1},{"pv":0.0,"res":194.9,"off":15.3,"ret":4.5,"dem":214.7}]},
-  {"type": "building", "block": "B-094", "residents": 546, "kwp": 129.8, "annual_pv": 197.1, "annual_dem": 3.0, "self_suff": 6.6, "summer": [{"pv":0.0,"res":200.1,"off":9.9,"ret":2.5,"dem":212.6},{"pv":14.9,"res":240.1,"off":29.8,"ret":7.6,"dem":277.6},{"pv":654.7,"res":228.7,"off":139.2,"ret":33.0,"dem":400.9},{"pv":111.6,"res":343.0,"off":69.6,"ret":28.0,"dem":440.6},{"pv":0.0,"res":228.7,"off":9.9,"ret":4.1,"dem":242.7}]}
+  {"block": "01", "residents": 412, "kwp": 165.2, "self_suff": 12.4, "summer": [{"pv":0,"dem":150},{"pv":15,"dem":180},{"pv":750,"dem":410},{"pv":120,"dem":380},{"pv":0,"dem":200}]},
+  {"block": "02", "residents": 380, "kwp": 140.5, "self_suff": 9.8, "summer": [{"pv":0,"dem":140},{"pv":10,"dem":160},{"pv":620,"dem":390},{"pv":90,"dem":350},{"pv":0,"dem":180}]},
+  {"block": "03", "residents": 450, "kwp": 180.1, "self_suff": 15.2, "summer": [{"pv":0,"dem":170},{"pv":20,"dem":210},{"pv":820,"dem":450},{"pv":140,"dem":420},{"pv":0,"dem":210}]},
+  {"block": "04", "residents": 290, "kwp": 110.4, "self_suff": 8.1, "summer": [{"pv":0,"dem":110},{"pv":8,"dem":130},{"pv":510,"dem":310},{"pv":70,"dem":280},{"pv":0,"dem":150}]},
+  {"block": "05", "residents": 510, "kwp": 210.8, "self_suff": 18.5, "summer": [{"pv":0,"dem":190},{"pv":30,"dem":240},{"pv":950,"dem":500},{"pv":180,"dem":480},{"pv":0,"dem":250}]},
+  {"block": "06", "residents": 340, "kwp": 125.2, "self_suff": 7.4, "summer": [{"pv":0,"dem":130},{"pv":12,"dem":150},{"pv":580,"dem":370},{"pv":100,"dem":330},{"pv":0,"dem":170}]},
+  {"block": "07", "residents": 425, "kwp": 172.6, "self_suff": 14.1, "summer": [{"pv":0,"dem":160},{"pv":18,"dem":190},{"pv":780,"dem":430},{"pv":130,"dem":400},{"pv":0,"dem":190}]},
+  {"block": "08", "residents": 315, "kwp": 115.9, "self_suff": 10.2, "summer": [{"pv":0,"dem":120},{"pv":11,"dem":140},{"pv":540,"dem":330},{"pv":85,"dem":310},{"pv":0,"dem":160}]},
+  {"block": "09", "residents": 480, "kwp": 195.4, "self_suff": 16.8, "summer": [{"pv":0,"dem":180},{"pv":25,"dem":220},{"pv":880,"dem":470},{"pv":160,"dem":440},{"pv":0,"dem":230}]},
+  {"block": "10", "residents": 365, "kwp": 138.2, "self_suff": 9.1, "summer": [{"pv":0,"dem":140},{"pv":13,"dem":170},{"pv":610,"dem":380},{"pv":110,"dem":340},{"pv":0,"dem":180}]},
+  {"block": "11", "residents": 440, "kwp": 178.5, "self_suff": 13.5, "summer": [{"pv":0,"dem":165},{"pv":19,"dem":200},{"pv":800,"dem":440},{"pv":135,"dem":410},{"pv":0,"dem":200}]},
+  {"block": "12", "residents": 395, "kwp": 152.3, "self_suff": 11.7, "summer": [{"pv":0,"dem":150},{"pv":14,"dem":180},{"pv":690,"dem":400},{"pv":115,"dem":370},{"pv":0,"dem":190}]},
+  {"block": "13", "residents": 520, "kwp": 220.6, "self_suff": 19.2, "summer": [{"pv":0,"dem":200},{"pv":35,"dem":260},{"pv":990,"dem":530},{"pv":195,"dem":510},{"pv":0,"dem":260}]},
+  {"block": "14", "residents": 305, "kwp": 108.9, "self_suff": 6.9, "summer": [{"pv":0,"dem":115},{"pv":9,"dem":140},{"pv":490,"dem":320},{"pv":80,"dem":290},{"pv":0,"dem":140}]},
+  {"block": "15", "residents": 460, "kwp": 188.4, "self_suff": 15.9, "summer": [{"pv":0,"dem":175},{"pv":22,"dem":215},{"pv":850,"dem":460},{"pv":155,"dem":430},{"pv":0,"dem":220}]},
+  {"block": "16", "residents": 330, "kwp": 122.1, "self_suff": 7.9, "summer": [{"pv":0,"dem":125},{"pv":10,"dem":155},{"pv":560,"dem":360},{"pv":95,"dem":320},{"pv":0,"dem":165}]},
+  {"block": "17", "residents": 405, "kwp": 160.7, "self_suff": 12.8, "summer": [{"pv":0,"dem":155},{"pv":16,"dem":185},{"pv":720,"dem":415},{"pv":125,"dem":385},{"pv":0,"dem":195}]},
+  {"block": "18", "residents": 375, "kwp": 145.8, "self_suff": 10.5, "summer": [{"pv":0,"dem":145},{"pv":12,"dem":175},{"pv":650,"dem":390},{"pv":105,"dem":355},{"pv":0,"dem":185}]}
 ];
 
-// HIGHLIGHT MATERIALS
 const MATS = {
   default_street: new THREE.MeshStandardMaterial({ color: 0x242f42, roughness: 0.8 }),
   default_building: new THREE.MeshStandardMaterial({ color: 0x1e293b, transparent: true, opacity: 0.7, emissive: 0x38bdf8, emissiveIntensity: 0.05 }),
@@ -219,20 +255,47 @@ function refreshHighlights() {
   });
 }
 
-function initMobilityChart() {
-  if(charts.mob) charts.mob.destroy();
-  charts.mob = new Chart(document.getElementById('mobilityChart'), {
-    type: 'doughnut',
-    data: { labels: ['Car', 'Pedestrian', 'Tram', 'Bike'], datasets: [{ data: [35, 25, 20, 20], backgroundColor: ['#34d399', '#38bdf8', '#a78bfa', '#f59e0b'], borderWidth: 0 }]},
-    options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 10, family: 'DM Mono' } } } } }
+// ASYNC CSV PARSER
+async function fetchAndParseCSV(url) {
+  const response = await fetch(url);
+  const text = await response.text();
+  const rows = text.split('\n').slice(1);
+  const agg = {};
+  rows.forEach(row => {
+    const cols = row.split(',');
+    if (cols.length < 3) return;
+    const mode = cols[1].trim();
+    const area = parseFloat(cols[2]);
+    agg[mode] = (agg[mode] || 0) + area;
   });
+  return agg;
+}
+
+const colorMap = { 'Road': '#34d399', 'Car': '#34d399', 'Bike': '#f59e0b', 'Pedestrian': '#38bdf8', 'Tram': '#a78bfa' };
+
+async function initMobilityChart() {
+  const currentData = await fetchAndParseCSV('Current Modal Share.csv');
+  const proposeData = await fetchAndParseCSV('Propose Modal Share.csv');
+
+  const buildChart = (id, data, chartKey) => {
+    if(charts[chartKey]) charts[chartKey].destroy();
+    const labels = Object.keys(data).map(k => k === 'Road' ? 'Road' : k);
+    const colors = Object.keys(data).map(k => colorMap[k] || '#94a3b8');
+    charts[chartKey] = new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { labels: labels, datasets: [{ data: Object.values(data), backgroundColor: colors, borderWidth: 0 }]},
+      options: { maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 9, family: 'DM Mono' } } } } }
+    });
+  };
+
+  buildChart('mobCurrentChart', currentData, 'mob1');
+  buildChart('mobProposedChart', proposeData, 'mob2');
 }
 
 function initAggregateEnergy() {
   if(charts.agg) charts.agg.destroy();
   charts.agg = new Chart(document.getElementById('aggEnergyChart'), {
-    type: 'line',
-    plugins: [surplusShadingPlugin],
+    type: 'line', plugins: [surplusShadingPlugin],
     data: {
       labels: ['00:00','06:00','12:00','18:00','23:00'],
       datasets: [
@@ -271,15 +334,20 @@ loader.load('3D_Street.glb', (gltf) => {
   });
 });
 
-loader.load('marie test.glb', (gltf) => {
+loader.load('3D_Building.glb', (gltf) => {
   const buildingGroup = gltf.scene;
   buildingGroup.position.set(-1400, 2, 400);
   scene.add(buildingGroup);
+  
+  let blockIndex = 0;
   buildingGroup.traverse(child => {
     if(child.isMesh) {
       child.material = MATS.default_building;
-      child.userData = BLOCKS[Math.floor(Math.random() * BLOCKS.length)];
+      // Map the mesh to a specific block in the BLOCKS array (1-18)
+      const data = BLOCKS[blockIndex % BLOCKS.length];
+      child.userData = { ...data, type: 'building' }; 
       interactables.push(child);
+      blockIndex++;
     }
   });
   document.getElementById('loading-overlay').remove();
