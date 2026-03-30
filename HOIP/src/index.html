@@ -187,7 +187,14 @@ const BLOCKS = [
 ];
 
 const MATS = {
-  default_street: new THREE.MeshStandardMaterial({ color: 0x242f42, roughness: 0.8 }),
+  // Enhanced street material: lighter color and lower roughness to catch highlights
+  default_street: new THREE.MeshStandardMaterial({ 
+    color: 0x334155, 
+    roughness: 0.4, 
+    metalness: 0.2,
+    emissive: 0x0f172a,
+    emissiveIntensity: 0.2
+  }),
   default_building: new THREE.MeshStandardMaterial({ color: 0x1e293b, transparent: true, opacity: 0.7, emissive: 0x38bdf8, emissiveIntensity: 0.05 }),
   leaf_green: new THREE.MeshStandardMaterial({ color: 0x2d6a4f, emissive: 0x1b4332, emissiveIntensity: 0.5 }),
   light_green: new THREE.MeshStandardMaterial({ color: 0x95d5b2, emissive: 0x74c69d, emissiveIntensity: 0.8, transparent: true, opacity: 0.95 })
@@ -326,13 +333,35 @@ controls.update();
 scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
 const loader = new GLTFLoader();
-loader.load('3D_Street.glb', (gltf) => {
+loader.load('3D_street.glb', (gltf) => {
   const streetGroup = gltf.scene;
   streetGroup.position.set(-1400, 0, 400);
   scene.add(streetGroup);
   streetGroup.traverse(child => {
     if(child.isMesh) {
       child.material = MATS.default_street;
+      child.userData = { type: 'street' };
+      interactables.push(child);
+    }
+  });
+});
+
+loader.load('Grand_Park.glb', (gltf) => {
+  const streetGroup = gltf.scene;
+  streetGroup.position.set(-1400, 0, 400);
+  scene.add(streetGroup);
+  streetGroup.traverse(child => {
+    if(child.isMesh) {
+      // Apply the enhanced material while preserving geometry details
+      child.material = MATS.default_street;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      
+      // Ensure normals are computed for sharp detail visibility
+      if (child.geometry) {
+        child.geometry.computeVertexNormals();
+      }
+
       child.userData = { type: 'street' };
       interactables.push(child);
     }
